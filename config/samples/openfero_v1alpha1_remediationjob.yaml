@@ -1,0 +1,18 @@
+apiVersion: openfero.io/v1alpha1
+kind: RemediationJob
+metadata:
+  name: sample-remediation
+spec:
+  template:
+    spec:
+      containers:
+        - name: remediation
+          image: busybox
+          command: ["/bin/sh"]
+          args:
+            - -c
+            - |
+              echo "Running remediation..."
+              sleep 5
+              echo "Remediation complete"
+      restartPolicy: Never
