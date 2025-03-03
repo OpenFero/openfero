@@ -30,6 +30,10 @@ import (
 	"k8s.io/client-go/rest"
 	cache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
+
+	"github.com/OpenFero/openfero/pkg/alertstore"
+	"github.com/OpenFero/openfero/pkg/alertstore/memberlist"
+	"github.com/OpenFero/openfero/pkg/alertstore/memory"
 )
 
 const contentType = "Content-Type"
@@ -91,6 +95,7 @@ type clientsetStruct struct {
 	configmapNamespace      string
 	configMapStore          cache.Store
 	jobStore                cache.Store
+	alertStore              alertstore.Store
 }
 
 type alertStoreEntry struct {
@@ -98,8 +103,6 @@ type alertStoreEntry struct {
 	Status    string    `json:"status"`
 	Timestamp time.Time `json:"timestamp"`
 }
-
-var alertStore []alertStoreEntry
 
 const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
 
@@ -260,11 +263,25 @@ func main() {
 	readTimeout := flag.Int("readTimeout", 5, "read timeout in seconds")
 	writeTimeout := flag.Int("writeTimeout", 10, "write timeout in seconds")
 	alertStoreSize := flag.Int("alertStoreSize", 10, "size of the alert store")
+	alertStoreType := flag.String("alertStoreType", "memory", "type of alert store (memory, memberlist)")
+	alertStoreClusterName := flag.String("alertStoreClusterName", "openfero", "Cluster name for memberlist alert store")
 
 	flag.Parse()
 
-	// Set the alert store size
-	alertStore = make([]alertStoreEntry, 0, *alertStoreSize)
+	// Initialize the appropriate alert store based on configuration
+	var store alertstore.Store
+	switch *alertStoreType {
+	case "memberlist":
+		store = memberlist.NewMemberlistStore(*alertStoreClusterName, *alertStoreSize)
+	default:
+		store = memory.NewMemoryStore(*alertStoreSize)
+	}
+
+	// Initialize the alert store
+	if err := store.Initialize(); err != nil {
+		log.Fatal("Failed to initialize alert store", zap.String("error", err.Error()))
+	}
+	defer store.Close()
 
 	// configure log
 	if err := initLogger(*logLevel); err != nil {
@@ -326,6 +343,7 @@ func main() {
 		configmapNamespace:      *configmapNamespace,
 		configMapStore:          configMapInformer,
 		jobStore:                jobInformer,
+		alertStore:              store,
 	}
 
 	//register metrics and set prometheus handler
@@ -587,20 +605,47 @@ func addJobLabels(jobObject *batchv1.Job) {
 	jobObject.Labels["app"] = "openfero"
 }
 
-// function which saves the alert in the alertStore
-func (server *clientsetStruct) saveAlert(alert alert, status string) {
+func (server *clientsetStruct) saveAlert(a alert, status string) {
 	log.Debug("Saving alert in alert store")
-	entry := alertStoreEntry{
-		Alert:     alert,
-		Status:    status,
-		Timestamp: time.Now(),
+	// Convert local alert type to alertstore.Alert type
+	storeAlert := alertstore.Alert{
+		Labels:      a.Labels,
+		Annotations: a.Annotations,
+		StartsAt:    a.StartsAt,
+		EndsAt:      a.EndsAt,
 	}
-	if len(alertStore) < cap(alertStore) {
-		alertStore = append(alertStore, entry)
-	} else {
-		log.Debug("Alert store is full, dropping oldest alert")
-		copy(alertStore, alertStore[1:])
-		alertStore[len(alertStore)-1] = entry
+	err := server.alertStore.SaveAlert(storeAlert, status)
+	if err != nil {
+		log.Error("Failed to save alert", zap.Error(err))
+	}
+}
+
+// @Summary Get alert store
+// @Description Get the stored alerts with optional filtering
+// @Tags alerts
+// @Produce json
+// @Param q query string false "Search query to filter alerts"
+// @Success 200 {array} alert
+// @Failure 500 {string} string "Internal Server Error"
+// @Router /alertStore [get]
+// function which provides alerts array to the getHandler
+func (server *clientsetStruct) alertStoreGetHandler(w http.ResponseWriter, r *http.Request) {
+	// Get search query parameter
+	query := r.URL.Query().Get("q")
+	limit := 100 // Default limit
+
+	alerts, err := server.alertStore.GetAlerts(query, limit)
+	if err != nil {
+		log.Error("Error retrieving alerts", zap.Error(err))
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set(contentType, applicationJSON)
+	err = json.NewEncoder(w).Encode(alerts)
+	if err != nil {
+		log.Error("Error encoding alerts", zap.Error(err))
+		http.Error(w, "", http.StatusInternalServerError)
 	}
 }
 
@@ -720,34 +765,6 @@ func verifyPath(path string) (string, error) {
 	}
 
 	return absPath, nil
-}
-
-// @Summary Get alert store
-// @Description Get the stored alerts with optional filtering
-// @Tags alerts
-// @Produce json
-// @Param q query string false "Search query to filter alerts"
-// @Success 200 {array} alert
-// @Failure 500 {string} string "Internal Server Error"
-// @Router /alertStore [get]
-// function which provides alerts array to the getHandler
-func (server *clientsetStruct) alertStoreGetHandler(w http.ResponseWriter, r *http.Request) {
-	// Get search query parameter
-	query := r.URL.Query().Get("q")
-	var alerts []alertStoreEntry
-
-	if query != "" {
-		alerts = filterAlerts(alertStore, query)
-	} else {
-		alerts = alertStore
-	}
-
-	w.Header().Set(contentType, applicationJSON)
-	err := json.NewEncoder(w).Encode(alerts)
-	if err != nil {
-		log.Error("error encoding alerts: ", zap.String("error", err.Error()))
-		http.Error(w, "", http.StatusInternalServerError)
-	}
 }
 
 // @Summary Get UI page
