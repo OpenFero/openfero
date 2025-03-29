@@ -16,7 +16,8 @@ before:
     #- go generate ./...
 
 builds:
-  - env:
+  - id: amd64
+    env:
       - CGO_ENABLED=0
     binary: openfero
     goos:
@@ -24,6 +25,15 @@ builds:
       - darwin
     goarch:
       - amd64
+
+  - id: arm64
+    env:
+      - CGO_ENABLED=0
+    binary: openfero
+    goos:
+      - linux
+      - darwin
+    goarch:
       - arm64
 
 release:
@@ -47,6 +57,8 @@ dockers:
     dockerfile: goreleaser.dockerfile
     use: buildx
     goarch: amd64
+    ids:
+      - amd64
     build_flag_templates:
       - "--pull"
       - "--label=org.opencontainers.image.created={{.Date}}"
@@ -61,6 +73,8 @@ dockers:
     dockerfile: goreleaser.dockerfile
     use: buildx
     goarch: arm64
+    ids:
+      - arm64
     build_flag_templates:
       - "--pull"
       - "--label=org.opencontainers.image.created={{.Date}}"
