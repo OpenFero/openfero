@@ -30,10 +30,14 @@ jobs:
       - name: Lint Code Base
         uses: super-linter/super-linter/slim@4e8a7c2bf106c4c766c816b35ec612638dc9b6b2 # v7.3.0
         env:
-          VALIDATE_ALL_CODEBASE: false
+          VALIDATE_ALL_CODEBASE: true
           VALIDATE_CHECKOV: false
           VALIDATE_GO: false
           VALIDATE_YAML: false
+          FIX_YAML_PRETTIER: true
+          FIX_MARKDOWN: true
+          FIX_SHELL_SHFMT: true
+          FIX_CSS: true
           KUBERNETES_KUBECONFORM_OPTIONS: "--ignore-missing-schemas --ignore-filename-pattern=charts/*"
           DEFAULT_BRANCH: "origin/main"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
