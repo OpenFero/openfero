@@ -2,7 +2,7 @@ name: Nightly build
 
 on:
   schedule:
-    - cron:  '0 0 * * *'
+    - cron: '0 0 * * 5'
   workflow_dispatch:
 
 jobs:
@@ -22,29 +22,29 @@ jobs:
           git config user.name "${GITHUB_ACTOR}"
           git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
 
-          DESCRIBE=`git tag -l | sed 's/^v//' | sort -V | grep -Ev "(nightly|latest)" | tail -n 1`
-          MAJOR_VERSION=`echo $DESCRIBE | awk '{split($0,a,"."); print a[1]}'`
-          MINOR_VERSION=`echo $DESCRIBE | awk '{split($0,a,"."); print a[2]}'`
-          MINOR_VERSION="$((${MINOR_VERSION} + 1))"
+          DESCRIBE=$(git tag -l | sed 's/^v//' | sort -V | grep -Ev "(nightly|latest)" | tail -n 1)
+          MAJOR_VERSION=$(echo "$DESCRIBE" | awk '{split($0,a,"."); print a[1]}')
+          MINOR_VERSION=$(echo "$DESCRIBE" | awk '{split($0,a,"."); print a[2]}')
+          MINOR_VERSION=$((MINOR_VERSION + 1))
           TAG="${MAJOR_VERSION}.${MINOR_VERSION}.0-nightly.$(date +'%Y%m%d')"
-          git tag -a $TAG -m "$TAG: nightly build"
-          git push origin $TAG
+          git tag -a "$TAG" -m "$TAG: nightly build"
+          git push origin "$TAG"
 
       - name: 'Clean up nightly releases'
         uses: dev-drprasad/delete-older-releases@dfbe6be2a006e9475dfcbe5b8d201f1824c2a9fe # v0.3.4
         with:
-          keep_latest: 7
+          keep_latest: 2
           delete_tags: true
           delete_tag_pattern: nightly
           delete_prerelease_only: true
         env:
           GITHUB_TOKEN: ${{ secrets.NIGHTLY_BUILD_GH_TOKEN }}
 
-      - name: 'Delete nightly containers older than a week'
+      - name: 'Delete nightly containers older than 3 weeks'
         uses: snok/container-retention-policy@4f22ef80902ad409ed55a99dc5133cc1250a0d03 # v3.0.0
         with:
           account: OpenFero
           image-names: openfero
           image-tags: '*-nightly*'
-          cut-off: 1w
+          cut-off: 3w
           token: ${{ secrets.NIGHTLY_BUILD_GH_TOKEN }}
