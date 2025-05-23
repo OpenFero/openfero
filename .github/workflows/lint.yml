@@ -1,0 +1,304 @@
+name: Lint Code Base
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+# This workflow replaces super-linter with individual, parallelized linting jobs
+# for better performance and more targeted feedback. Each linter runs only when
+# relevant files are changed, determined by the path filter.
+
+jobs:
+  # Determine changed files for efficient linting
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      go: ${{ steps.filter.outputs.go }}
+      yaml: ${{ steps.filter.outputs.yaml }}
+      javascript: ${{ steps.filter.outputs.javascript }}
+      css: ${{ steps.filter.outputs.css }}
+      shell: ${{ steps.filter.outputs.shell }}
+      dockerfile: ${{ steps.filter.outputs.dockerfile }}
+      markdown: ${{ steps.filter.outputs.markdown }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Check for file changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            go:
+              - '**/*.go'
+            yaml:
+              - '**/*.yml'
+              - '**/*.yaml'
+            javascript:
+              - '**/*.js'
+              - '!**/node_modules/**'
+              - '!**/*.min.js'
+            css:
+              - '**/*.css'
+              - '!**/*.min.css'
+            shell:
+              - '**/*.sh'
+            dockerfile:
+              - '**/Dockerfile*'
+              - '**/*.dockerfile'
+            markdown:
+              - '**/*.md'
+
+  # Go linting with golangci-lint
+  lint-go:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+          
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --config=.github/linters/.golangci.yml
+
+  # YAML linting
+  lint-yaml:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.yaml == 'true'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+          
+      - name: Install yamllint
+        run: pip install yamllint
+        
+      - name: Run yamllint
+        run: |
+          find . -name "*.yml" -o -name "*.yaml" | grep -v node_modules | xargs yamllint -c .github/linters/.yamllint
+
+  # JavaScript linting
+  lint-javascript:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.javascript == 'true'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install ESLint
+        run: |
+          npm install -g eslint @eslint/js
+          
+      - name: Create ESLint config
+        run: |
+          cat > eslint.config.js << 'EOF'
+          import js from "@eslint/js";
+          
+          export default [
+            js.configs.recommended,
+            {
+              languageOptions: {
+                ecmaVersion: 2022,
+                sourceType: "script",
+                globals: {
+                  "console": "readonly",
+                  "document": "readonly",
+                  "window": "readonly",
+                  "bootstrap": "readonly",
+                  "htmx": "readonly"
+                }
+              },
+              rules: {
+                "no-unused-vars": "warn",
+                "no-undef": "error"
+              }
+            }
+          ];
+          EOF
+          
+      - name: Run ESLint
+        run: |
+          find . -name "*.js" -not -path "*/node_modules/*" -not -name "*.min.js" | xargs eslint
+
+  # CSS linting
+  lint-css:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.css == 'true'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install stylelint
+        run: npm install -g stylelint stylelint-config-standard
+        
+      - name: Create stylelint config
+        run: |
+          cat > .stylelintrc.json << 'EOF'
+          {
+            "extends": ["stylelint-config-standard"],
+            "rules": {
+              "property-no-vendor-prefix": null,
+              "value-no-vendor-prefix": null,
+              "selector-no-vendor-prefix": null
+            }
+          }
+          EOF
+          
+      - name: Run stylelint
+        run: |
+          find . -name "*.css" -not -name "*.min.css" | xargs stylelint
+
+  # Shell script linting
+  lint-shell:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.shell == 'true'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: './scripts'
+
+  # Dockerfile linting
+  lint-dockerfile:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.dockerfile == 'true'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Run Hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: './goreleaser.dockerfile'
+
+  # Markdown linting
+  lint-markdown:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.markdown == 'true'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install markdownlint
+        run: npm install -g markdownlint-cli
+        
+      - name: Create markdownlint config
+        run: |
+          cat > .markdownlint.json << 'EOF'
+          {
+            "MD013": false,
+            "MD033": false,
+            "MD041": false
+          }
+          EOF
+          
+      - name: Run markdownlint
+        run: |
+          find . -name "*.md" | xargs markdownlint
+
+  # Summary job that depends on all linting jobs
+  lint-summary:
+    runs-on: ubuntu-latest
+    needs: [changes, lint-go, lint-yaml, lint-javascript, lint-css, lint-shell, lint-dockerfile, lint-markdown]
+    if: always()
+    permissions:
+      contents: read
+    steps:
+      - name: Check linting results
+        run: |
+          echo "Linting completed for all applicable file types"
+          
+          # Check each job result, considering that skipped jobs are successful
+          declare -a failed_jobs=()
+          
+          if [[ "${{ needs.lint-go.result }}" == "failure" ]]; then
+            failed_jobs+=("Go")
+          fi
+          if [[ "${{ needs.lint-yaml.result }}" == "failure" ]]; then
+            failed_jobs+=("YAML")
+          fi
+          if [[ "${{ needs.lint-javascript.result }}" == "failure" ]]; then
+            failed_jobs+=("JavaScript")
+          fi
+          if [[ "${{ needs.lint-css.result }}" == "failure" ]]; then
+            failed_jobs+=("CSS")
+          fi
+          if [[ "${{ needs.lint-shell.result }}" == "failure" ]]; then
+            failed_jobs+=("Shell")
+          fi
+          if [[ "${{ needs.lint-dockerfile.result }}" == "failure" ]]; then
+            failed_jobs+=("Dockerfile")
+          fi
+          if [[ "${{ needs.lint-markdown.result }}" == "failure" ]]; then
+            failed_jobs+=("Markdown")
+          fi
+          
+          if [[ ${#failed_jobs[@]} -gt 0 ]]; then
+            echo "❌ Failed linting jobs: ${failed_jobs[*]}"
+            exit 1
+          fi
+          
+          echo "✅ All linting jobs passed or were skipped"
