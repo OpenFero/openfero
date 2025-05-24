@@ -154,3 +154,45 @@ data:
 In words, OpenFero takes the labels from the alert or alerts (if Alertmanager sends multiple alerts in the event) and adds them to the job as environment variables.
 
 This allows you to make more specific decisions in the Operarios logic based on the information in the labels.
+
+## Securing the Webhook /alerts Endpoint
+
+OpenFero allows you to secure its `/alerts` POST endpoint using a bearer token. This prevents unauthorized parties from triggering jobs.
+
+To enable authentication, start OpenFero with the `--authToken` command-line flag, providing a secret token:
+
+```bash
+./openfero --authToken="your-very-secret-token"
+```
+
+If the `--authToken` flag is not provided or is set to an empty string, authentication for the `/alerts` endpoint will be disabled, and OpenFero will accept requests without checking for a token.
+
+### Sending Authenticated Requests
+
+When authentication is enabled, clients sending alerts to the `/alerts` endpoint must include an `Authorization` header with the bearer token.
+
+Here's an example using `curl`:
+
+```bash
+curl -X POST \
+  http://localhost:8080/alerts \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-very-secret-token" \
+  -d '{
+        "status": "firing",
+        "receiver": "openfero",
+        "alerts": [
+          {
+            "labels": {
+              "alertname": "TestAlert",
+              "service": "MyService"
+            },
+            "annotations": {
+              "summary": "This is a test alert for authenticated endpoint"
+            }
+          }
+        ]
+      }'
+```
+
+Make sure to replace `your-very-secret-token` with the actual token you configured when starting OpenFero. If the token is missing or incorrect, OpenFero will respond with a `401 Unauthorized` error.

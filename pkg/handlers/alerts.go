@@ -11,6 +11,7 @@ import (
 	"github.com/OpenFero/openfero/pkg/services"
 	"github.com/OpenFero/openfero/pkg/utils"
 	"go.uber.org/zap"
+	"strings"
 )
 
 const (
@@ -22,6 +23,7 @@ const (
 type Server struct {
 	KubeClient *kubernetes.Client
 	AlertStore alertstore.Store
+	AuthToken  string
 }
 
 // AlertsGetHandler handles GET requests to /alerts
@@ -39,6 +41,30 @@ func (s *Server) AlertsGetHandler(w http.ResponseWriter, r *http.Request) {
 
 // AlertsPostHandler handles POST requests to /alerts
 func (s *Server) AlertsPostHandler(w http.ResponseWriter, r *http.Request) {
+	// Authentication check
+	if s.AuthToken != "" {
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			log.Warn("Authorization header missing")
+			http.Error(w, "Authorization header missing", http.StatusUnauthorized)
+			return
+		}
+
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			log.Warn("Invalid Authorization header format")
+			http.Error(w, "Invalid Authorization header format. Expected Bearer token.", http.StatusUnauthorized)
+			return
+		}
+
+		token := parts[1]
+		if token != s.AuthToken {
+			log.Warn("Invalid token")
+			http.Error(w, "Invalid token", http.StatusUnauthorized)
+			return
+		}
+	}
+
 	dec := json.NewDecoder(r.Body)
 	defer r.Body.Close()
 

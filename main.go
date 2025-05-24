@@ -69,6 +69,7 @@ func main() {
 	alertStoreType := flag.String("alertStoreType", "memory", "type of alert store (memory, memberlist)")
 	alertStoreClusterName := flag.String("alertStoreClusterName", "openfero", "Cluster name for memberlist alert store")
 	labelSelector := flag.String("labelSelector", "app=openfero", "label selector for OpenFero ConfigMaps in the format key=value")
+	authToken := flag.String("authToken", "", "Authentication token for API requests. If not set, authentication is disabled.")
 
 	flag.Parse()
 
@@ -137,6 +138,7 @@ func main() {
 	server := &handlers.Server{
 		KubeClient: kubeClient,
 		AlertStore: store,
+		AuthToken:  *authToken,
 	}
 
 	// Pass build information to handlers
