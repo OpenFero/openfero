@@ -68,7 +68,7 @@ require (
 	github.com/swaggo/http-swagger/v2 v2.0.2
 	go.uber.org/zap v1.27.0
 	golang.org/x/net v0.38.0 // indirect
-	golang.org/x/oauth2 v0.25.0 // indirect
+	golang.org/x/oauth2 v0.27.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
 	golang.org/x/term v0.30.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
