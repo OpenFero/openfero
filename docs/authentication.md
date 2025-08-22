@@ -5,31 +5,36 @@ OpenFero supports authentication to secure the `/alerts` webhook endpoint.
 ## Quick Setup
 
 ### Basic Auth
+
 ```bash
-./openfero --authMethod=basic --authBasicUser=admin --authBasicPass=secret123
+./openfero --authMethod=basic --authBasicUser=admin --authBasicPass=your-password-here
 ```
 
 ### Bearer Token  
+
 ```bash
-./openfero --authMethod=bearer --authBearerToken=my-api-key-12345
+./openfero --authMethod=bearer --authBearerToken=your-token-here
 ```
 
 ### No Auth (Default)
+
 ```bash
 ./openfero  # No authentication required
 ```
 
 ## Alertmanager Configuration
 
-### Basic Auth
+### Basic Auth Alertmanager
+
 ```yaml
 receivers:
 - name: 'openfero'
   webhook_configs:
-  - url: 'http://admin:secret123@openfero:8080/alerts'
+  - url: 'http://admin:your-password-here@openfero:8080/alerts'
 ```
 
-### Bearer Token
+### Bearer Token Alertmanager
+
 ```yaml
 receivers:
 - name: 'openfero'  
@@ -38,7 +43,7 @@ receivers:
     http_config:
       authorization:
         type: Bearer
-        credentials: my-api-key-12345
+        credentials: your-token-here
 ```
 
 ## Kubernetes Deployment
@@ -69,8 +74,8 @@ spec:
 curl -X POST http://localhost:8080/alerts -d '{}'
 
 # With basic auth - should succeed  
-curl -u admin:secret123 -X POST http://localhost:8080/alerts -d '{}'
+curl -u admin:your-password-here -X POST http://localhost:8080/alerts -d '{}'
 
 # With bearer token - should succeed
-curl -H "Authorization: Bearer my-api-key-12345" -X POST http://localhost:8080/alerts -d '{}'
+curl -H "Authorization: Bearer your-token-here" -X POST http://localhost:8080/alerts -d '{}'
 ```

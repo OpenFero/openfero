@@ -19,7 +19,7 @@ func TestAuthMiddleware_None(t *testing.T) {
 	middleware := handlers.AuthMiddleware(authConfig)
 	handler := middleware(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("success"))
+		_, _ = w.Write([]byte("success"))
 	})
 
 	req := httptest.NewRequest("POST", "/alerts", strings.NewReader("{}"))
@@ -42,7 +42,7 @@ func TestAuthMiddleware_BasicAuth_Success(t *testing.T) {
 	middleware := handlers.AuthMiddleware(authConfig)
 	handler := middleware(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("success"))
+		_, _ = w.Write([]byte("success"))
 	})
 
 	req := httptest.NewRequest("POST", "/alerts", strings.NewReader("{}"))
@@ -66,7 +66,7 @@ func TestAuthMiddleware_BasicAuth_Failure(t *testing.T) {
 	middleware := handlers.AuthMiddleware(authConfig)
 	handler := middleware(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("success"))
+		_, _ = w.Write([]byte("success"))
 	})
 
 	// Test with wrong credentials
@@ -98,7 +98,7 @@ func TestAuthMiddleware_BasicAuth_NoCredentials(t *testing.T) {
 	middleware := handlers.AuthMiddleware(authConfig)
 	handler := middleware(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("success"))
+		_, _ = w.Write([]byte("success"))
 	})
 
 	// Test without credentials
@@ -121,7 +121,7 @@ func TestAuthMiddleware_BearerToken_Success(t *testing.T) {
 	middleware := handlers.AuthMiddleware(authConfig)
 	handler := middleware(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("success"))
+		_, _ = w.Write([]byte("success"))
 	})
 
 	req := httptest.NewRequest("POST", "/alerts", strings.NewReader("{}"))
@@ -144,7 +144,7 @@ func TestAuthMiddleware_BearerToken_Failure(t *testing.T) {
 	middleware := handlers.AuthMiddleware(authConfig)
 	handler := middleware(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("success"))
+		_, _ = w.Write([]byte("success"))
 	})
 
 	// Test with wrong token
@@ -175,7 +175,7 @@ func TestAuthMiddleware_BearerToken_NoToken(t *testing.T) {
 	middleware := handlers.AuthMiddleware(authConfig)
 	handler := middleware(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("success"))
+		_, _ = w.Write([]byte("success"))
 	})
 
 	// Test without Authorization header
@@ -197,7 +197,7 @@ func TestAuthMiddleware_InvalidMethod(t *testing.T) {
 	middleware := handlers.AuthMiddleware(authConfig)
 	handler := middleware(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("success"))
+		_, _ = w.Write([]byte("success"))
 	})
 
 	req := httptest.NewRequest("POST", "/alerts", strings.NewReader("{}"))
