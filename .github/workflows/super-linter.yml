@@ -37,6 +37,8 @@ jobs:
           VALIDATE_GO: false # needs to be false if VALIDATE_GO_MODULES is true
           VALIDATE_JSX: false
           VALIDATE_CSS: false
+          # GitLeaks configuration to exclude documentation files
+          GITLEAKS_CONFIG_FILE: ".gitleaks.toml"
           KUBERNETES_KUBECONFORM_OPTIONS: "--ignore-missing-schemas --ignore-filename-pattern=charts/*"
           DEFAULT_BRANCH: "origin/main"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

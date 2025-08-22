@@ -22,6 +22,7 @@ const (
 type Server struct {
 	KubeClient *kubernetes.Client
 	AlertStore alertstore.Store
+	AuthConfig AuthConfig
 }
 
 // AlertsGetHandler handles GET requests to /alerts

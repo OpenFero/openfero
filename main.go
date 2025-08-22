@@ -44,6 +44,32 @@ func initLogger(logLevel string) error {
 	return log.SetConfig(cfg)
 }
 
+// validateAuthConfig validates the authentication configuration
+func validateAuthConfig(config handlers.AuthConfig) error {
+	switch config.Method {
+	case handlers.AuthMethodNone:
+		// No validation needed for "none"
+		return nil
+	case handlers.AuthMethodBasic:
+		if config.BasicUser == "" || config.BasicPass == "" {
+			return fmt.Errorf("basic authentication requires both username and password")
+		}
+		return nil
+	case handlers.AuthMethodBearer:
+		if config.BearerToken == "" {
+			return fmt.Errorf("bearer authentication requires a token")
+		}
+		return nil
+	case handlers.AuthMethodOAuth2:
+		if config.OAuth2Issuer == "" || config.OAuth2Audience == "" {
+			return fmt.Errorf("OAuth2 authentication requires both issuer and audience")
+		}
+		return nil
+	default:
+		return fmt.Errorf("unsupported authentication method: %s", config.Method)
+	}
+}
+
 // @title OpenFero API
 // @version 1.0
 // @description OpenFero is intended as an event-triggered job scheduler for code agnostic recovery jobs.
@@ -69,6 +95,14 @@ func main() {
 	alertStoreType := flag.String("alertStoreType", "memory", "type of alert store (memory, memberlist)")
 	alertStoreClusterName := flag.String("alertStoreClusterName", "openfero", "Cluster name for memberlist alert store")
 	labelSelector := flag.String("labelSelector", "app=openfero", "label selector for OpenFero ConfigMaps in the format key=value")
+
+	// Authentication flags
+	authMethod := flag.String("authMethod", "none", "authentication method for webhook endpoint (none, basic, bearer, oauth2)")
+	authBasicUser := flag.String("authBasicUser", "", "username for basic authentication")
+	authBasicPass := flag.String("authBasicPass", "", "password for basic authentication")
+	authBearerToken := flag.String("authBearerToken", "", "bearer token for token-based authentication")
+	authOAuth2Issuer := flag.String("authOAuth2Issuer", "", "OAuth2 token issuer URL")
+	authOAuth2Audience := flag.String("authOAuth2Audience", "", "OAuth2 token audience")
 
 	flag.Parse()
 
@@ -137,10 +171,34 @@ func main() {
 		LabelSelector:           parsedLabelSelector,
 	}
 
+	// Validate and create authentication configuration
+	authConfig := handlers.AuthConfig{
+		Method:         handlers.AuthMethod(*authMethod),
+		BasicUser:      *authBasicUser,
+		BasicPass:      *authBasicPass,
+		BearerToken:    *authBearerToken,
+		OAuth2Issuer:   *authOAuth2Issuer,
+		OAuth2Audience: *authOAuth2Audience,
+	}
+
+	// Validate authentication configuration
+	if err := validateAuthConfig(authConfig); err != nil {
+		log.Fatal("Invalid authentication configuration", zap.Error(err))
+	}
+
+	// Log authentication configuration (without sensitive data)
+	if authConfig.Method != handlers.AuthMethodNone {
+		log.Info("Authentication enabled for webhook endpoint",
+			zap.String("method", string(authConfig.Method)))
+	} else {
+		log.Info("No authentication configured for webhook endpoint")
+	}
+
 	// Initialize HTTP server
 	server := &handlers.Server{
 		KubeClient: kubeClient,
 		AlertStore: store,
+		AuthConfig: authConfig,
 	}
 
 	// Pass build information to handlers
@@ -158,7 +216,12 @@ func main() {
 	http.HandleFunc("GET /readiness", server.ReadinessGetHandler)
 	http.HandleFunc("GET /alertStore", server.AlertStoreGetHandler)
 	http.HandleFunc("GET /alerts", server.AlertsGetHandler)
-	http.HandleFunc("POST /alerts", server.AlertsPostHandler)
+
+	// Apply authentication middleware to the webhook endpoint
+	authMiddleware := handlers.AuthMiddleware(authConfig)
+	http.HandleFunc("POST /alerts", authMiddleware(server.AlertsPostHandler))
+
+	// Other routes remain unprotected
 	http.HandleFunc("GET /", handlers.UIHandler)
 	http.HandleFunc("GET /jobs", server.JobsUIHandler)
 	http.HandleFunc("GET /about", handlers.AboutHandler)
