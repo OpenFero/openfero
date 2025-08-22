@@ -47,6 +47,10 @@ spec:
               valueFrom:
                 resourceFieldRef:
                   resource: limits.memory
+            {{- if .Values.operarius.enabled }}
+            - name: USE_OPERARIUS_CRDS
+              value: "{{ .Values.operarius.useOperariusCRDs }}"
+            {{- end }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
