@@ -73,9 +73,9 @@ spec:
 # Without auth - should fail
 curl -X POST http://localhost:8080/alerts -d '{}'
 
-# With basic auth - should succeed
-curl -u admin:your-password-here -X POST http://localhost:8080/alerts -d '{}'
+# With basic auth - should succeed  
+curl -u username:password -X POST http://localhost:8080/alerts -d '{}'
 
 # With bearer token - should succeed
-curl -H "Authorization: Bearer your-token-here" -X POST http://localhost:8080/alerts -d '{}'
+curl -H "Authorization: Bearer YOUR_TOKEN" -X POST http://localhost:8080/alerts -d '{}'
 ```
