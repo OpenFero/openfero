@@ -10,7 +10,7 @@ OpenFero supports authentication to secure the `/alerts` webhook endpoint.
 ./openfero --authMethod=basic --authBasicUser=admin --authBasicPass=your-password-here
 ```
 
-### Bearer Token  
+### Bearer Token
 
 ```bash
 ./openfero --authMethod=bearer --authBearerToken=your-token-here
@@ -28,22 +28,22 @@ OpenFero supports authentication to secure the `/alerts` webhook endpoint.
 
 ```yaml
 receivers:
-- name: 'openfero'
-  webhook_configs:
-  - url: 'http://admin:your-password-here@openfero:8080/alerts'
+  - name: "openfero"
+    webhook_configs:
+      - url: "http://admin:your-password-here@openfero:8080/alerts"
 ```
 
 ### Bearer Token Alertmanager
 
 ```yaml
 receivers:
-- name: 'openfero'  
-  webhook_configs:
-  - url: 'http://openfero:8080/alerts'
-    http_config:
-      authorization:
-        type: Bearer
-        credentials: your-token-here
+  - name: "openfero"
+    webhook_configs:
+      - url: "http://openfero:8080/alerts"
+        http_config:
+          authorization:
+            type: Bearer
+            credentials: your-token-here
 ```
 
 ## Kubernetes Deployment
@@ -57,14 +57,14 @@ spec:
   template:
     spec:
       containers:
-      - name: openfero
-        args: ["--authMethod=bearer", "--authBearerToken=$(TOKEN)"]
-        env:
-        - name: TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: openfero-auth
-              key: token
+        - name: openfero
+          args: ["--authMethod=bearer", "--authBearerToken=$(TOKEN)"]
+          env:
+            - name: TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: openfero-auth
+                  key: token
 ```
 
 ## Testing
@@ -73,7 +73,7 @@ spec:
 # Without auth - should fail
 curl -X POST http://localhost:8080/alerts -d '{}'
 
-# With basic auth - should succeed  
+# With basic auth - should succeed
 curl -u admin:your-password-here -X POST http://localhost:8080/alerts -d '{}'
 
 # With bearer token - should succeed
