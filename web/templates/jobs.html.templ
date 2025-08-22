@@ -1,11 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <title>OpenFero - {{ .Title }}</title>
+    <!-- Add theme-toggle script early in head to prevent flash -->
+    <script src="/assets/js/theme-toggle.js"></script>
     <link rel="stylesheet" href="/assets/css/bootstrap.min.css">
     <link rel="stylesheet" href="/assets/css/style.css">
+    <link rel="stylesheet" href="/assets/bootstrap-icons-1.11.3/font/bootstrap-icons.min.css">
+    <script src="/assets/js/bootstrap.bundle.min.js"></script>
 </head>
+
 <body style="padding-top: 70px;">
     {{ template "navbar" . }}
     <div class="container">
@@ -29,4 +36,5 @@
         </table>
     </div>
 </body>
+
 </html>

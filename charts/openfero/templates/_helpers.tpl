@@ -63,3 +63,16 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Determine if alertStoreType should be set
+*/}}
+{{- define "openfero.shouldSetAlertStoreType" -}}
+{{- $customArgsHasAlertStoreType := false -}}
+{{- range .Values.customArgs -}}
+  {{- if contains "alertStoreType" . -}}
+    {{- $customArgsHasAlertStoreType = true -}}
+  {{- end -}}
+{{- end -}}
+{{- if and (not $customArgsHasAlertStoreType) (or .Values.autoscaling.enabled (gt (int .Values.replicaCount) 1)) }}true{{- end }}
+{{- end }}

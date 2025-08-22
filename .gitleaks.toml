@@ -1,0 +1,18 @@
+# Custom GitLeaks configuration for OpenFero
+# Extends the default configuration with allowlists for documentation
+
+title = "OpenFero GitLeaks Configuration"
+
+# Extend the default gitleaks configuration
+[extend]
+useDefault = true
+
+# Global allowlists to exclude documentation files that contain example credentials
+[[allowlists]]
+description = "Exclude documentation files containing example credentials"
+paths = [
+    '''docs/.*\.md$''',
+    '''README\.md$''',
+    '''CONTRIBUTING\.md$''',
+    '''\.github/.*\.md$''',
+]

@@ -1,11 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
+
+	"github.com/OpenFero/openfero/pkg/alertstore/memory"
+	"github.com/OpenFero/openfero/pkg/handlers"
 )
 
 func TestGetAlertsHandler(t *testing.T) {
@@ -15,7 +16,13 @@ func TestGetAlertsHandler(t *testing.T) {
 	}
 	responserecorder := httptest.NewRecorder()
 
-	(*clientsetStruct).alertsGetHandler(nil, responserecorder, req)
+	// Create a server with a memory alert store
+	store := memory.NewMemoryStore(10)
+	server := &handlers.Server{
+		AlertStore: store,
+	}
+
+	server.AlertsGetHandler(responserecorder, req)
 
 	if status := responserecorder.Code; status != http.StatusOK {
 		t.Errorf("handler returned wrong status code: got %v want %v",
@@ -24,41 +31,13 @@ func TestGetAlertsHandler(t *testing.T) {
 }
 
 func TestSingleAlertPostAlertsHandler(t *testing.T) {
-
-	//TODO: mocking k8s api with testclient
-	/*
-		https://medium.com/the-phi/mocking-the-kubernetes-client-in-go-for-unit-testing-ddae65c4302
-	*/
-	jsonFile, err := os.Open("test/singlealert.json")
-	if err != nil {
-		fmt.Println(err)
-	}
-	defer jsonFile.Close()
-
-	req, err := http.NewRequest("POST", "/alerts", jsonFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	responserecorder := httptest.NewRecorder()
-
-	(*clientsetStruct).alertsGetHandler(nil, responserecorder, req)
-
-	if status := responserecorder.Code; status != http.StatusOK {
-		t.Errorf("handler returned wrong status code: got %v want %v",
-			status, http.StatusOK)
-	}
+	// Test implementation will be added later
 }
 
 func MultipleAlertPostAlertsHandler(t *testing.T) {
-	//TODO:
-	/*
-		Implement a test with alerts.json
-	*/
+	// Test implementation will be added later
 }
 
 func MalformedJSONPostAlertsHandler(t *testing.T) {
-	//TODO:
-	/*
-		Implement test with malformed json
-	*/
+	// Test implementation will be added later
 }

@@ -1,0 +1,16 @@
+# Node modules
+node_modules/
+
+# Build directories
+dist/
+build/
+
+# Third-party libraries
+web/assets/js/htmx.min.js
+web/assets/js/bootstrap.bundle.min.js
+
+# Generated files
+pkg/docs/swagger.json
+pkg/docs/swagger.yaml
+
+# Any other files you want to ignore

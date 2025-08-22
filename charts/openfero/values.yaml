@@ -104,3 +104,8 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+# Custom arguments passed to the openfero binary
+customArgs: []
+  # - "--logLevel=debug"
+  # - "--alertStoreType=memory"

@@ -3,10 +3,24 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
-	"reflect"
+	"os"
 	"strings"
 	"testing"
+
+	"github.com/OpenFero/openfero/pkg/alertstore"
+	"github.com/OpenFero/openfero/pkg/alertstore/memory"
+	"github.com/OpenFero/openfero/pkg/handlers"
+	"github.com/OpenFero/openfero/pkg/models"
+	"github.com/OpenFero/openfero/pkg/utils"
 )
+
+func TestMain(m *testing.M) {
+	// Initialize logger before running tests
+	if err := initLogger("debug"); err != nil {
+		os.Exit(1)
+	}
+	os.Exit(m.Run())
+}
 
 func TestSanitizeInput(t *testing.T) {
 	tests := []struct {
@@ -43,7 +57,7 @@ func TestSanitizeInput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := sanitizeInput(tt.input)
+			result := utils.SanitizeInput(tt.input)
 			if result != tt.expected {
 				t.Errorf("sanitizeInput(%q) = %q; want %q", tt.input, result, tt.expected)
 			}
@@ -81,7 +95,7 @@ func TestStringWithCharset(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := stringWithCharset(tt.length, tt.charset)
+			result := utils.StringWithCharset(tt.length, tt.charset)
 			if len(result) != tt.length {
 				t.Errorf("stringWithCharset(%d, %q) = %q; want length %d", tt.length, tt.charset, result, tt.length)
 			}
@@ -98,49 +112,41 @@ func TestStringWithCharset(t *testing.T) {
 // Benchmark the stringWithCharset function
 func BenchmarkStringWithCharset(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		stringWithCharset(10, "abcdefghijklmnopqrstuvwxyz0123456789")
+		utils.StringWithCharset(10, "abcdefghijklmnopqrstuvwxyz0123456789")
 	}
 }
 
 func TestSaveAlert(t *testing.T) {
 	tests := []struct {
 		name           string
-		initialAlerts  []alert
-		newAlert       alert
-		expectedAlerts []alert
+		initialAlerts  []alertstore.AlertEntry
+		newAlert       models.Alert
+		newStatus      string
+		expectedLabels map[string][]string // Expected label values by key
 		alertStoreSize int
 	}{
 		{
 			name: "Add alert to non-full store",
-			initialAlerts: []alert{
-				{Labels: map[string]string{"alertname": "alert1"}},
+			initialAlerts: []alertstore.AlertEntry{
+				{
+					Alert:  alertstore.Alert{Labels: map[string]string{"alertname": "alert1"}},
+					Status: "firing",
+				},
 			},
-			newAlert: alert{Labels: map[string]string{"alertname": "alert2"}},
-			expectedAlerts: []alert{
-				{Labels: map[string]string{"alertname": "alert1"}},
-				{Labels: map[string]string{"alertname": "alert2"}},
+			newAlert:  models.Alert{Labels: map[string]string{"alertname": "alert2"}},
+			newStatus: "firing",
+			expectedLabels: map[string][]string{
+				"alertname": {"alert1", "alert2"}, // We expect both alert1 and alert2 to be present
 			},
 			alertStoreSize: 10,
 		},
-		// {
-		// 	name: "Add alert to full store",
-		// 	initialAlerts: []alert{
-		// 		{Labels: map[string]string{"alertname": "alert1"}},
-		// 		{Labels: map[string]string{"alertname": "alert2"}},
-		// 	},
-		// 	newAlert: alert{Labels: map[string]string{"alertname": "alert3"}},
-		// 	expectedAlerts: []alert{
-		// 		{Labels: map[string]string{"alertname": "alert2"}},
-		// 		{Labels: map[string]string{"alertname": "alert3"}},
-		// 	},
-		// 	alertStoreSize: 2,
-		// },
 		{
 			name:          "Add alert to empty store",
-			initialAlerts: []alert{},
-			newAlert:      alert{Labels: map[string]string{"alertname": "alert1"}},
-			expectedAlerts: []alert{
-				{Labels: map[string]string{"alertname": "alert1"}},
+			initialAlerts: []alertstore.AlertEntry{},
+			newAlert:      models.Alert{Labels: map[string]string{"alertname": "alert1"}},
+			newStatus:     "firing",
+			expectedLabels: map[string][]string{
+				"alertname": {"alert1"}, // We expect only alert1 to be present
 			},
 			alertStoreSize: 10,
 		},
@@ -148,106 +154,99 @@ func TestSaveAlert(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			alertStore = make([]alert, 0, tt.alertStoreSize)
-			alertStore = append(alertStore, tt.initialAlerts...)
-			copy(alertStore, tt.initialAlerts)
+			// Initialize a memory store for testing
+			store := memory.NewMemoryStore(tt.alertStoreSize)
 
-			server := &clientsetStruct{}
-			server.saveAlert(tt.newAlert)
+			// Pre-populate the store with initial alerts
+			for _, entry := range tt.initialAlerts {
+				_ = store.SaveAlert(entry.Alert, entry.Status)
+			}
 
-			if !reflect.DeepEqual(alertStore, tt.expectedAlerts) {
-				t.Errorf("saveAlert() = %v; want %v", alertStore, tt.expectedAlerts)
+			// Convert the Alert to alertstore.Alert and save it
+			storeAlert := tt.newAlert.ToAlertStoreAlert()
+			err := store.SaveAlert(storeAlert, tt.newStatus)
+			if err != nil {
+				t.Fatalf("Failed to save alert: %v", err)
+			}
+
+			// Get all alerts from the store
+			alerts, err := store.GetAlerts("", 0)
+			if err != nil {
+				t.Fatalf("Failed to get alerts: %v", err)
+			}
+
+			// Verify the expected number of alerts
+			expectedCount := len(tt.initialAlerts) + 1 // Initial alerts + newly added alert
+			if len(alerts) != expectedCount {
+				t.Errorf("SaveAlert() store length = %d, want %d", len(alerts), expectedCount)
+			}
+
+			// Check that all expected labels are present
+			for key, expectedValues := range tt.expectedLabels {
+				// Collect actual values for this label
+				actualValues := make([]string, 0)
+				for _, alert := range alerts {
+					if val, ok := alert.Alert.Labels[key]; ok {
+						actualValues = append(actualValues, val)
+					}
+				}
+
+				// Check that we have all expected values
+				if len(actualValues) != len(expectedValues) {
+					t.Errorf("SaveAlert() found %d values for label %s, want %d",
+						len(actualValues), key, len(expectedValues))
+				}
+
+				// Check that each expected value is present (ignoring order)
+				for _, expected := range expectedValues {
+					found := false
+					for _, actual := range actualValues {
+						if expected == actual {
+							found = true
+							break
+						}
+					}
+					if !found {
+						t.Errorf("SaveAlert() missing expected label value %s=%s", key, expected)
+					}
+				}
+			}
+
+			// Verify all alerts have the correct status
+			for _, alert := range alerts {
+				// Initial alerts should have their original status, new alert should have tt.newStatus
+				var isNewAlert bool
+				if val, ok := alert.Alert.Labels["alertname"]; ok {
+					isNewAlert = val == tt.newAlert.Labels["alertname"]
+				}
+
+				if isNewAlert && alert.Status != tt.newStatus {
+					t.Errorf("New alert has incorrect status: got %s, want %s",
+						alert.Status, tt.newStatus)
+				}
 			}
 		})
 	}
 }
 
 func BenchmarkSaveAlert(b *testing.B) {
-	initialAlerts := []alert{
-		{Labels: map[string]string{"alertname": "alert1"}},
-		{Labels: map[string]string{"alertname": "alert2"}},
-	}
-	newAlert := alert{Labels: map[string]string{"alertname": "alert3"}}
-	alertStoreSize := 10
+	store := memory.NewMemoryStore(10)
+
+	// Initial alerts
+	initialAlert := alertstore.Alert{Labels: map[string]string{"alertname": "alert1"}}
+	_ = store.SaveAlert(initialAlert, "firing")
+
+	// New alert to add repeatedly
+	newAlert := models.Alert{Labels: map[string]string{"alertname": "alert3"}}
+	storeAlert := newAlert.ToAlertStoreAlert()
 
 	for i := 0; i < b.N; i++ {
-		alertStore = make([]alert, len(initialAlerts), alertStoreSize)
-		copy(alertStore, initialAlerts)
-
-		server := &clientsetStruct{}
-		server.saveAlert(newAlert)
+		_ = store.SaveAlert(storeAlert, "firing")
 	}
 }
 
-// func TestAlertStoreGetHandler(t *testing.T) {
-// 	tests := []struct {
-// 		name           string
-// 		query          string
-// 		expectedStatus int
-// 		expectedAlerts []alert
-// 	}{
-// 		{
-// 			name:           "No query parameter",
-// 			query:          "",
-// 			expectedStatus: http.StatusOK,
-// 			expectedAlerts: alertStore,
-// 		},
-// 		{
-// 			name:           "Query parameter matches",
-// 			query:          "testAlert",
-// 			expectedStatus: http.StatusOK,
-// 			expectedAlerts: []alert{
-// 				{
-// 					Labels: map[string]string{
-// 						"alertname": "testAlert",
-// 					},
-// 					Annotations: map[string]string{
-// 						"description": "This is a test alert",
-// 					},
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name:           "Query parameter does not match",
-// 			query:          "nonexistentAlert",
-// 			expectedStatus: http.StatusOK,
-// 			expectedAlerts: []alert{},
-// 		},
-// 	}
-
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			req, err := http.NewRequest("GET", "/alertStore?q="+tt.query, nil)
-// 			if err != nil {
-// 				t.Fatal(err)
-// 			}
-
-// 			rr := httptest.NewRecorder()
-// 			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-// 				server := &clientsetStruct{}
-// 				server.alertStoreGetHandler(w, r)
-// 			})
-
-// 			handler.ServeHTTP(rr, req)
-
-// 			if status := rr.Code; status != tt.expectedStatus {
-// 				t.Errorf("handler returned wrong status code: got %v want %v",
-// 					status, tt.expectedStatus)
-// 			}
-
-// 			var alerts []alert
-// 			err = json.NewDecoder(rr.Body).Decode(&alerts)
-// 			if err != nil {
-// 				t.Fatal(err)
-// 			}
-
-// 			if !reflect.DeepEqual(alerts, tt.expectedAlerts) {
-// 				t.Errorf("handler returned unexpected body: got %v want %v",
-// 					alerts, tt.expectedAlerts)
-// 			}
-// 		})
-// 	}
-// }
+// Commented test functions left as is since they're already commented out
+// func TestAlertStoreGetHandler(t *testing.T) {...}
 
 func BenchmarkAlertStoreGetHandler(b *testing.B) {
 	req, err := http.NewRequest("GET", "/alertStore", nil)
@@ -255,14 +254,13 @@ func BenchmarkAlertStoreGetHandler(b *testing.B) {
 		b.Fatal(err)
 	}
 
+	// Create store and server
+	store := memory.NewMemoryStore(10)
+	server := &handlers.Server{AlertStore: store}
+
 	for i := 0; i < b.N; i++ {
 		rr := httptest.NewRecorder()
-		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			server := &clientsetStruct{}
-			server.alertStoreGetHandler(w, r)
-		})
-
-		handler.ServeHTTP(rr, req)
+		server.AlertStoreGetHandler(rr, req)
 	}
 }
 
@@ -272,13 +270,12 @@ func BenchmarkAlertStoreGetHandlerWithQuery(b *testing.B) {
 		b.Fatal(err)
 	}
 
+	// Create store and server
+	store := memory.NewMemoryStore(10)
+	server := &handlers.Server{AlertStore: store}
+
 	for i := 0; i < b.N; i++ {
 		rr := httptest.NewRecorder()
-		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			server := &clientsetStruct{}
-			server.alertStoreGetHandler(w, r)
-		})
-
-		handler.ServeHTTP(rr, req)
+		server.AlertStoreGetHandler(rr, req)
 	}
 }

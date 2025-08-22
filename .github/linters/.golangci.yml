@@ -1,10 +1,28 @@
-linters-settings:
-  staticcheck:
-    checks:
-      - all
-      - "-G114" # disable the rule G114
-  govet:
-    enable:
-      - shadow # enable the shadow check
-run:
-  timeout: 5m
+version: "2"
+linters:
+  settings:
+    govet:
+      enable:
+        - shadow
+    staticcheck:
+      checks:
+        - all
+        - -G114
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

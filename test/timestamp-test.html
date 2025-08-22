@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Timestamp Converter Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        line-height: 1.6;
+      }
+
+      .test-section {
+        border: 1px solid #ddd;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 5px;
+      }
+
+      .result {
+        background-color: #f9f9f9;
+        padding: 10px;
+        margin-top: 10px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+      }
+
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+      }
+
+      th {
+        background-color: #f2f2f2;
+      }
+
+      .pass {
+        color: green;
+      }
+
+      .fail {
+        color: red;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>Timestamp Converter Test</h1>
+    <p>
+      This page tests if the timestamp converter is correctly handling timezone
+      conversions.
+    </p>
+
+    <div class="test-section">
+      <h2>Browser Information</h2>
+      <div id="browser-info" class="result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>Test Cases</h2>
+      <table id="test-cases">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Original Server Timestamp</th>
+            <th>Converted (by our script)</th>
+            <th>Expected (JS native)</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Test cases will be inserted here by JavaScript -->
+        </tbody>
+      </table>
+    </div>
+
+    <script src="../web/assets/js/timestamp-converter.js"></script>
+
+    <script>
+      // Display browser timezone information
+      document.getElementById("browser-info").innerHTML = `
+            <p><strong>Timezone:</strong> ${Intl.DateTimeFormat().resolvedOptions().timeZone}</p>
+            <p><strong>Timezone Offset:</strong> ${new Date().getTimezoneOffset() / -60} hours</p>
+            <p><strong>Current Local Time:</strong> ${new Date().toLocaleString()}</p>
+        `;
+
+      // Test cases - Add different timestamp formats your application uses
+      const testCases = [
+        {
+          type: "Go Format",
+          timestamp: "2023-06-15 08:30:00 +0000 UTC",
+        },
+        {
+          type: "Go Format with ms",
+          timestamp: "2023-06-15 08:30:00.12345 +0000 UTC",
+        },
+        {
+          type: "Go Format with ms (precision)",
+          timestamp: "2023-06-15 08:30:00.12345 +0000 UTC",
+          precision: "ms",
+        },
+        {
+          type: "ISO with ms (precision)",
+          timestamp: "2023-06-15T08:30:00.789Z",
+          precision: "ms",
+        },
+        {
+          type: "Different Timezone",
+          timestamp: "2023-06-15 08:30:00 +0200 CEST",
+        },
+        {
+          type: "ISO String",
+          timestamp: "2023-06-15T08:30:00Z",
+        },
+        {
+          type: "ISO with Offset",
+          timestamp: "2023-06-15T08:30:00+02:00",
+        },
+        {
+          type: "Custom Timezone (New York)",
+          timestamp: "2023-06-15 08:30:00 +0000 UTC",
+          timezone: "America/New_York",
+        },
+        {
+          type: "Custom Timezone + ms (Tokyo)",
+          timestamp: "2023-06-15 08:30:00.12345 +0000 UTC",
+          timezone: "Asia/Tokyo",
+          precision: "ms",
+        },
+      ];
+
+      // Function to run the tests
+      function runTests() {
+        const tbody = document.querySelector("#test-cases tbody");
+        tbody.innerHTML = ""; // Clear existing rows
+
+        testCases.forEach((test) => {
+          const row = document.createElement("tr");
+
+          // Type
+          const typeCell = document.createElement("td");
+          typeCell.textContent = test.type;
+          row.appendChild(typeCell);
+
+          // Original timestamp
+          const originalCell = document.createElement("td");
+          originalCell.textContent = test.timestamp;
+          row.appendChild(originalCell);
+
+          // Create test element for our converter
+          const testElement = document.createElement("span");
+          testElement.className = "server-timestamp";
+          testElement.setAttribute("data-timestamp", test.timestamp);
+          if (test.timezone) {
+            testElement.setAttribute("data-timezone", test.timezone);
+          }
+          if (test.precision) {
+            testElement.setAttribute("data-precision", test.precision);
+          }
+          testElement.textContent = test.timestamp; // Default text
+
+          // Converted by our script
+          const convertedCell = document.createElement("td");
+          convertedCell.appendChild(testElement);
+          row.appendChild(convertedCell);
+
+          // Expected (native JS)
+          const expectedCell = document.createElement("td");
+          try {
+            let date;
+
+            // Special handling for Go format timestamps
+            const goMatch = test.timestamp.match(
+              /^(\d{4}-\d{2}-\d{2})\s(\d{2}:\d{2}:\d{2})(?:\.(\d+))?\s([+-]\d{4})\s\w+/,
+            );
+            if (goMatch) {
+              const [, datePart, timePart, msPart, offset] = goMatch;
+              const isoString = `${datePart}T${timePart}${msPart ? "." + msPart : ""}${offset}`;
+              date = new Date(isoString);
+            } else {
+              // Standard formats
+              date = new Date(test.timestamp);
+            }
+
+            if (!isNaN(date.getTime())) {
+              // Format options
+              const options = {
+                dateStyle: "medium",
+                timeStyle: "medium",
+                timeZone:
+                  test.timezone ||
+                  Intl.DateTimeFormat().resolvedOptions().timeZone,
+              };
+
+              // Add milliseconds if requested
+              if (test.precision === "ms") {
+                // We need to use individual components for millisecond support
+                delete options.dateStyle;
+                delete options.timeStyle;
+
+                Object.assign(options, {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "numeric",
+                  second: "numeric",
+                  fractionalSecondDigits: 3, // For milliseconds
+                });
+              }
+
+              expectedCell.textContent = new Intl.DateTimeFormat(
+                navigator.language,
+                options,
+              ).format(date);
+            } else {
+              expectedCell.textContent = "Unable to parse with native JS";
+            }
+          } catch (e) {
+            expectedCell.textContent = "Error: " + e.message;
+          }
+          row.appendChild(expectedCell);
+
+          // Result cell (will be filled after conversion)
+          const resultCell = document.createElement("td");
+          row.appendChild(resultCell);
+
+          tbody.appendChild(row);
+        });
+
+        // Run the converter - this should update all .server-timestamp elements
+        convertTimestampsToLocalTimezone();
+
+        // Check results
+        document
+          .querySelectorAll("#test-cases tbody tr")
+          .forEach((row, index) => {
+            const converted = row.cells[2].textContent.trim();
+            const expected = row.cells[3].textContent.trim();
+            const resultCell = row.cells[4];
+
+            if (
+              expected === "Unable to parse with native JS" ||
+              expected.startsWith("Error:")
+            ) {
+              resultCell.textContent = "N/A";
+              resultCell.className = "";
+            } else if (converted === testCases[index].timestamp) {
+              resultCell.textContent = "FAIL - Not converted";
+              resultCell.className = "fail";
+            } else if (converted === expected) {
+              resultCell.textContent = "PASS";
+              resultCell.className = "pass";
+            } else {
+              // Compare actual date objects rather than just string representations
+              resultCell.textContent = "FAIL - Different format";
+              resultCell.className = "fail";
+              console.log(
+                `Test case ${index + 1}: Expected "${expected}" but got "${converted}"`,
+              );
+            }
+          });
+      }
+
+      // Run tests after page loads
+      document.addEventListener("DOMContentLoaded", runTests);
+    </script>
+  </body>
+</html>
