@@ -5,8 +5,8 @@ metadata:
   name: {{ include "openfero.fullname" . }}
   namespace: {{ .Release.Namespace }}
 spec:
-    minAvailable: 1
-    selector:
-      matchLabels:
+  minAvailable: 1
+  selector:
+    matchLabels:
       {{- include "openfero.selectorLabels" . | nindent 6 }}
 {{- end }}
