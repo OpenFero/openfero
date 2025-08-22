@@ -1,5 +1,5 @@
 apiVersion: openfero.io/v1alpha1
-kind: RemediationJob
+kind: Operarii
 metadata:
   name: sample-remediation
 spec:
