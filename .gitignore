@@ -30,4 +30,5 @@
 .DS_STORE
 
 dist/
-.vscode/openfero
+.vscode/
+openfero
