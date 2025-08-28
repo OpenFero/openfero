@@ -5,7 +5,7 @@ go 1.24.6
 require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/hashicorp/memberlist v0.5.3
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/swaggo/swag v1.16.6
 	k8s.io/api v0.33.4
 	k8s.io/apimachinery v0.33.4
