@@ -9,7 +9,7 @@ on:
         required: true
   push:
     tags:
-      - '[0-9]+.[0-9]+.[0-9]+*'
+      - "[0-9]+.[0-9]+.[0-9]+*"
 
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
     permissions:
       contents: write
       packages: write
-      pull-requests: write  # Add permission to create pull requests
+      pull-requests: write # Add permission to create pull requests
     env:
       NEW_VERSION: "0.0.0"
       IS_NIGHTLY: false
@@ -40,9 +40,9 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
-          go-version-file: 'go.mod'
+          go-version-file: "go.mod"
 
       - name: Setup Docker buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
@@ -94,24 +94,24 @@ jobs:
           NEW_PATCH=$((PATCH + 1))
           NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
           echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
-          
+
           # Update both version and appVersion
           sed -i "s/^version: .*/version: $NEW_VERSION/g" charts/openfero/Chart.yaml
           sed -i "s/^appVersion: .*/appVersion: ${{ github.event.inputs.tag }}/g" charts/openfero/Chart.yaml
-          
+
           helm package charts/* --destination .cr-release-packages
 
       - name: Push charts to GHCR
         id: push-charts
         if: ${{ !contains(github.ref, '-nightly') }}
         run: |
-           shopt -s nullglob
-           for pkg in .cr-release-packages/*; do
-             if [ -z "${pkg:-}" ]; then
-               break
-             fi
-             helm push "${pkg}" "oci://ghcr.io/openfero/openfero/charts"
-           done
+          shopt -s nullglob
+          for pkg in .cr-release-packages/*; do
+            if [ -z "${pkg:-}" ]; then
+              break
+            fi
+            helm push "${pkg}" "oci://ghcr.io/openfero/openfero/charts"
+          done
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
