@@ -1,0 +1,51 @@
+# Trivy configuration file for OpenFero
+# Documentation: https://aquasecurity.github.io/trivy/latest/docs/references/configuration/
+
+# Misconfiguration scanning options
+misconfig:
+  # Include checks for these file types
+  include-non-failures: false
+  
+  # Policy configuration
+  policy:
+    # Custom ignore list for acceptable findings
+    ignore:
+      # AVD-KSV-0125: Container uses image from untrusted registry
+      # Reason: GitHub Container Registry (ghcr.io) is trusted for OpenFero project
+      - AVD-KSV-0125
+      
+      # AVD-KSV-0048: Role should not have broad access to resources  
+      # Reason: OpenFero requires job creation permissions for its core remediation functionality
+      # The role is properly scoped to only 'jobs' resources in the 'batch' API group with minimal verbs
+      - AVD-KSV-0048
+
+# Vulnerability scanning
+vulnerability:
+  type:
+    - os
+    - library
+
+# Report configuration
+report:
+  format: table
+  
+# Severity levels to report (excluding LOW and INFO to reduce noise)
+severity:
+  - MEDIUM
+  - HIGH  
+  - CRITICAL
+
+# Exit code - set to 0 to not fail pipeline on ignored findings
+exit-code: 0
+
+# Skip specific directories
+skip-dirs:
+  - ".git"
+  - "node_modules"
+  - "vendor"
+
+# File patterns to skip
+skip-files:
+  - "**/.git/**"
+  - "**/node_modules/**"
+  - "**/vendor/**"

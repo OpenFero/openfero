@@ -61,6 +61,9 @@ jobs:
           VALIDATE_GO: false # needs to be false if VALIDATE_GO_MODULES is true
           VALIDATE_JSX: false
           VALIDATE_CSS: false
+          # Enable Trivy security scanning
+          VALIDATE_TRIVY: true
+          TRIVY_CONFIG_FILE: "trivy.yaml"
           # GitLeaks configuration to exclude documentation files
           GITLEAKS_CONFIG_FILE: ".gitleaks.toml"
           KUBERNETES_KUBECONFORM_OPTIONS: "--ignore-missing-schemas --ignore-filename-pattern=charts/*"
