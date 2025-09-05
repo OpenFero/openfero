@@ -21,6 +21,7 @@ jobs:
         with:
           token: ${{ secrets.NIGHTLY_BUILD_GH_TOKEN }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: 'Push new tag'
         run: |
