@@ -9,8 +9,26 @@ name: Lint Code Base
 on:
   push:
     branches: ["main"]
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+      - "README*"
+      - "CHANGELOG*"
+      - "LICENSE*"
+      - "CONTRIBUTORS*"
+      - "AUTHORS*"
+      - "operarios/README.md"
   pull_request:
     branches: ["main"]
+    paths-ignore:
+      - "docs/**"  
+      - "*.md"
+      - "README*"
+      - "CHANGELOG*"
+      - "LICENSE*"
+      - "CONTRIBUTORS*"
+      - "AUTHORS*"
+      - "operarios/README.md"
 permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
 
