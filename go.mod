@@ -7,9 +7,9 @@ require (
 	github.com/hashicorp/memberlist v0.5.3
 	github.com/stretchr/testify v1.11.1
 	github.com/swaggo/swag v1.16.6
-	k8s.io/api v0.34.0
+	k8s.io/api v0.34.1
 	k8s.io/apimachinery v0.34.1
-	k8s.io/client-go v0.34.0
+	k8s.io/client-go v0.34.1
 )
 
 require (
