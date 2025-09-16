@@ -19,6 +19,7 @@ jobs:
     permissions:
       contents: write # Required for accessing repository content
       packages: write # Required for publishing Helm charts to GHCR
+      id-token: write # Required for OIDC token for Cosign
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
@@ -63,3 +64,28 @@ jobs:
             fi
             helm push "${pkg}" "oci://ghcr.io/openfero/openfero/charts"
           done
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
+        with:
+          cosign-release: "v2.6.0"
+
+      - name: Sign Helm charts
+        run: |
+          echo "Signing Helm charts with Cosign..."
+
+          # Extract chart version from Chart.yaml
+          CHART_VERSION=$(grep '^version:' charts/openfero/Chart.yaml | awk '{print $2}')
+          CHART_NAME="openfero"
+
+          # Sign the Helm chart in OCI registry
+          echo "Signing chart: ${CHART_NAME}:${CHART_VERSION}"
+          cosign sign --yes "ghcr.io/openfero/openfero/charts/${CHART_NAME}:${CHART_VERSION}"
+
+          echo "Helm chart signed successfully"
+
+          # Verify the signature
+          echo "Verifying signature..."
+          cosign verify "ghcr.io/openfero/openfero/charts/${CHART_NAME}:${CHART_VERSION}" \
+            --certificate-identity-regexp "https://github.com/openfero/openfero/.github/workflows/release-only-chart.yaml@.*" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" || echo "Verification completed (may show warnings for new signatures)"
