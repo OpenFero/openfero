@@ -56,8 +56,8 @@ cosign verify ghcr.io/openfero/openfero:latest \
 ### Verify nightly builds
 
 ```bash
-cosign verify ghcr.io/openfero/openfero:1.0.1-nightly.20250916 \
-  --certificate-identity-regexp "https://github.com/OpenFero/openfero/.github/workflows/nightly-build.yml@.*" \
+cosign verify ghcr.io/openfero/openfero:0.16.0-nightly.20250916 \
+  --certificate-identity-regexp "https://github.com/OpenFero/openfero/.github/workflows/release.yml@.*" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 ```
 
@@ -77,9 +77,9 @@ cosign verify ghcr.io/openfero/openfero/charts/openfero:1.0.0 \
 
 ```bash
 # Download release artifacts
-curl -LO "https://github.com/openfero/openfero/releases/download/v1.0.0/checksums.txt"
-curl -LO "https://github.com/openfero/openfero/releases/download/v1.0.0/checksums.txt.sig"
-curl -LO "https://github.com/openfero/openfero/releases/download/v1.0.0/checksums.txt.pem"
+curl -LO "https://github.com/OpenFero/openfero/releases/download/v1.0.0/checksums.txt"
+curl -LO "https://github.com/OpenFero/openfero/releases/download/v1.0.0/checksums.txt.sig"
+curl -LO "https://github.com/OpenFero/openfero/releases/download/v1.0.0/checksums.txt.pem"
 
 # Verify checksums signature
 cosign verify-blob checksums.txt \
@@ -93,9 +93,9 @@ cosign verify-blob checksums.txt \
 
 ```bash
 # Download SBOM and signature
-curl -LO "https://github.com/openfero/openfero/releases/download/v1.0.0/openfero_1.0.0_linux_amd64.tar.gz.sbom.json"
-curl -LO "https://github.com/openfero/openfero/releases/download/v1.0.0/openfero_1.0.0_linux_amd64.tar.gz.sbom.json.sig"
-curl -LO "https://github.com/openfero/openfero/releases/download/v1.0.0/openfero_1.0.0_linux_amd64.tar.gz.sbom.json.pem"
+curl -LO "https://github.com/OpenFero/openfero/releases/download/v1.0.0/openfero_1.0.0_linux_amd64.tar.gz.sbom.json"
+curl -LO "https://github.com/OpenFero/openfero/releases/download/v1.0.0/openfero_1.0.0_linux_amd64.tar.gz.sbom.json.sig"
+curl -LO "https://github.com/OpenFero/openfero/releases/download/v1.0.0/openfero_1.0.0_linux_amd64.tar.gz.sbom.json.pem"
 
 # Verify SBOM signature
 cosign verify-blob openfero_1.0.0_linux_amd64.tar.gz.sbom.json \
@@ -131,7 +131,7 @@ spec:
           - issuer: "https://token.actions.githubusercontent.com"
             subject: "https://github.com/OpenFero/openfero/.github/workflows/release.yml@refs/tags/v*"
           - issuer: "https://token.actions.githubusercontent.com"
-            subject: "https://github.com/OpenFero/openfero/.github/workflows/nightly-build.yml@refs/heads/main"
+            subject: "https://github.com/OpenFero/openfero/.github/workflows/release.yml@refs/heads/main"
 ```
 
 Apply the policy:
@@ -220,6 +220,6 @@ cosign verify ghcr.io/openfero/openfero:latest \
 
 If you have issues verifying signatures:
 
-1. Check the [GitHub Actions workflow logs](https://github.com/openfero/openfero/actions)
+1. Check the [GitHub Actions workflow logs](https://github.com/OpenFero/openfero/actions)
 2. Verify you're using the latest version of Cosign
-3. Open an issue in the [OpenFero repository](https://github.com/openfero/openfero/issues)
+3. Open an issue in the [OpenFero repository](https://github.com/OpenFero/openfero/issues)
