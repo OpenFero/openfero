@@ -41,7 +41,7 @@ choco install cosign
 
 ```bash
 cosign verify ghcr.io/openfero/openfero:v1.0.0 \
-  --certificate-identity-regexp "https://github.com/openfero/openfero/.github/workflows/release.yml@.*" \
+  --certificate-identity-regexp "https://github.com/OpenFero/openfero/.github/workflows/release.yml@.*" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 ```
 
@@ -49,7 +49,7 @@ cosign verify ghcr.io/openfero/openfero:v1.0.0 \
 
 ```bash
 cosign verify ghcr.io/openfero/openfero:latest \
-  --certificate-identity-regexp "https://github.com/openfero/openfero/.github/workflows/release.yml@.*" \
+  --certificate-identity-regexp "https://github.com/OpenFero/openfero/.github/workflows/release.yml@.*" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 ```
 
@@ -57,7 +57,7 @@ cosign verify ghcr.io/openfero/openfero:latest \
 
 ```bash
 cosign verify ghcr.io/openfero/openfero:1.0.1-nightly.20250916 \
-  --certificate-identity-regexp "https://github.com/openfero/openfero/.github/workflows/nightly-build.yml@.*" \
+  --certificate-identity-regexp "https://github.com/OpenFero/openfero/.github/workflows/nightly-build.yml@.*" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 ```
 
@@ -67,7 +67,7 @@ cosign verify ghcr.io/openfero/openfero:1.0.1-nightly.20250916 \
 
 ```bash
 cosign verify ghcr.io/openfero/openfero/charts/openfero:1.0.0 \
-  --certificate-identity-regexp "https://github.com/openfero/openfero/.github/workflows/release-only-chart.yaml@.*" \
+  --certificate-identity-regexp "https://github.com/OpenFero/openfero/.github/workflows/release-only-chart.yaml@.*" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 ```
 
@@ -85,7 +85,7 @@ curl -LO "https://github.com/openfero/openfero/releases/download/v1.0.0/checksum
 cosign verify-blob checksums.txt \
   --signature checksums.txt.sig \
   --certificate checksums.txt.pem \
-  --certificate-identity-regexp "https://github.com/openfero/openfero/.github/workflows/release.yml@.*" \
+  --certificate-identity-regexp "https://github.com/OpenFero/openfero/.github/workflows/release.yml@.*" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 ```
 
@@ -101,7 +101,7 @@ curl -LO "https://github.com/openfero/openfero/releases/download/v1.0.0/openfero
 cosign verify-blob openfero_1.0.0_linux_amd64.tar.gz.sbom.json \
   --signature openfero_1.0.0_linux_amd64.tar.gz.sbom.json.sig \
   --certificate openfero_1.0.0_linux_amd64.tar.gz.sbom.json.pem \
-  --certificate-identity-regexp "https://github.com/openfero/openfero/.github/workflows/release.yml@.*" \
+  --certificate-identity-regexp "https://github.com/OpenFero/openfero/.github/workflows/release.yml@.*" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 ```
 
@@ -129,9 +129,9 @@ spec:
     - keyless:
         identities:
           - issuer: "https://token.actions.githubusercontent.com"
-            subject: "https://github.com/openfero/openfero/.github/workflows/release.yml@refs/tags/v*"
+            subject: "https://github.com/OpenFero/openfero/.github/workflows/release.yml@refs/tags/v*"
           - issuer: "https://token.actions.githubusercontent.com"
-            subject: "https://github.com/openfero/openfero/.github/workflows/nightly-build.yml@refs/heads/main"
+            subject: "https://github.com/OpenFero/openfero/.github/workflows/nightly-build.yml@refs/heads/main"
 ```
 
 Apply the policy:
@@ -194,7 +194,7 @@ cosign tree ghcr.io/openfero/openfero:latest
 
 # Show certificate details
 cosign verify ghcr.io/openfero/openfero:latest \
-  --certificate-identity-regexp "https://github.com/openfero/openfero/.github/workflows/release.yml@.*" \
+  --certificate-identity-regexp "https://github.com/OpenFero/openfero/.github/workflows/release.yml@.*" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
   --output json | jq '.[]'
 ```

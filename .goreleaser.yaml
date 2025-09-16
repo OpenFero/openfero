@@ -44,42 +44,19 @@ archives:
 
 dockers:
   - image_templates:
-      - ghcr.io/openfero/openfero:{{ .Version }}-amd64
+      - ghcr.io/openfero/openfero:{{ .Version }}
+      - ghcr.io/openfero/openfero:latest
     dockerfile: goreleaser.dockerfile
     use: buildx
-    goarch: amd64
     build_flag_templates:
       - "--pull"
       - "--label=org.opencontainers.image.created={{.Date}}"
       - "--label=org.opencontainers.image.title={{.ProjectName}}"
       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
       - "--label=org.opencontainers.image.version={{.Version}}"
-      - "--platform=linux/amd64"
+      - "--platform=linux/amd64,linux/arm64"
     extra_files:
       - web/
-  - image_templates:
-      - ghcr.io/openfero/openfero:{{ .Version }}-arm64
-    dockerfile: goreleaser.dockerfile
-    use: buildx
-    goarch: arm64
-    build_flag_templates:
-      - "--pull"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title={{.ProjectName}}"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
-      - "--platform=linux/arm64"
-    extra_files:
-      - web/
-docker_manifests:
-  - name_template: "ghcr.io/openfero/openfero:{{ .Version }}"
-    image_templates:
-      - "ghcr.io/openfero/openfero:{{ .Version }}-amd64"
-      - "ghcr.io/openfero/openfero:{{ .Version }}-arm64"
-  - name_template: "ghcr.io/openfero/openfero:latest"
-    image_templates:
-      - "ghcr.io/openfero/openfero:{{ .Version }}-amd64"
-      - "ghcr.io/openfero/openfero:{{ .Version }}-arm64"
 
 changelog:
   sort: asc
