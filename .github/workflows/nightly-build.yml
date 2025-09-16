@@ -5,10 +5,17 @@ on:
     - cron: '0 0 * * 5'
   workflow_dispatch:
 
+# Default to read-only permissions
+permissions:
+  contents: read
+
 jobs:
   build-nightly:
     name: Push tag for nightly build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required for creating tags and releases
+      packages: write # Required for container management
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1

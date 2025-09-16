@@ -22,9 +22,9 @@ jobs:
   goreleaser:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      packages: write
-      pull-requests: write # Add permission to create pull requests
+      contents: write # Required for creating releases
+      packages: write # Required for publishing container images
+      pull-requests: write # Required for creating pull requests
     env:
       NEW_VERSION: "0.0.0"
       IS_NIGHTLY: false

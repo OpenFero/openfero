@@ -38,9 +38,9 @@ jobs:
     name: Analyze
     runs-on: ubuntu-latest
     permissions:
-      actions: read
-      contents: read
-      security-events: write
+      actions: read # Required for getting workflow metadata
+      contents: read # Required for checking out the repository
+      security-events: write # Required for uploading SARIF results
 
     strategy:
       fail-fast: false

@@ -15,8 +15,8 @@ jobs:
   label:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      pull-requests: write
+      contents: read # Required for reading repository content
+      pull-requests: write # Required for adding labels to pull requests
 
     steps:
       - name: Harden the runner (Audit all outbound calls)
