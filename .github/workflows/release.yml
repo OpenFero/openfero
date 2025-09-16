@@ -22,9 +22,9 @@ jobs:
   goreleaser:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      packages: write
-      pull-requests: write # Add permission to create pull requests
+      contents: write # Required for creating releases
+      packages: write # Required for publishing container images
+      pull-requests: write # Required for creating pull requests
     env:
       NEW_VERSION: "0.0.0"
       IS_NIGHTLY: false
@@ -44,6 +44,7 @@ jobs:
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version-file: "go.mod"
+          cache: false # Disable cache to prevent cache poisoning
 
       - name: Setup Docker buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
@@ -61,12 +62,18 @@ jobs:
           prev_tag=$(git tag -l | sed 's/^v//' | sort -V | grep -Ev "(nightly|latest)" | tail -n 1)
           echo "GORELEASER_PREVIOUS_TAG=$prev_tag" >> "$GITHUB_ENV"
 
-      - run: git tag ${{ github.event.inputs.tag }}
+      - name: Create tag
+        env:
+          TAG_NAME: ${{ github.event.inputs.tag }}
+        run: git tag "$TAG_NAME"
 
       - name: Set pre-release flag for nightly builds
         id: set-prerelease
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+          GITHUB_REF_NAME: ${{ github.ref }}
         run: |
-          if [[ "${{ github.event.inputs.tag }}" =~ .*-nightly.* ]] || [[ "${{ github.ref }}" =~ .*-nightly.* ]]; then
+          if [[ "$INPUT_TAG" =~ .*-nightly.* ]] || [[ "$GITHUB_REF_NAME" =~ .*-nightly.* ]]; then
             echo "IS_NIGHTLY=true" >> "$GITHUB_ENV"
           else
             echo "IS_NIGHTLY=false" >> "$GITHUB_ENV"
@@ -86,6 +93,8 @@ jobs:
       - name: Package charts
         id: chart-releaser
         if: ${{ !contains(github.ref, '-nightly') }}
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
           # Get current version and calculate new patch version
           CURRENT_VERSION=$(grep '^version:' charts/openfero/Chart.yaml | awk '{print $2}')
@@ -98,7 +107,7 @@ jobs:
 
           # Update both version and appVersion
           sed -i "s/^version: .*/version: $NEW_VERSION/g" charts/openfero/Chart.yaml
-          sed -i "s/^appVersion: .*/appVersion: ${{ github.event.inputs.tag }}/g" charts/openfero/Chart.yaml
+          sed -i "s/^appVersion: .*/appVersion: ${INPUT_TAG}/g" charts/openfero/Chart.yaml
 
           helm package charts/* --destination .cr-release-packages
 

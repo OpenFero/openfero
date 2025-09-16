@@ -8,17 +8,20 @@ on:
     branches: [main]
 
 # Declare default permissions as read only.
-permissions: read-all
+permissions:
+  contents: read
 
 jobs:
   analysis:
     name: Scorecards analysis
     runs-on: ubuntu-latest
     permissions:
-      # Needed to upload the results to code-scanning dashboard.
+      # Needed to upload the results to code-scanning dashboard
       security-events: write
+      # Required for fetching repository information
       actions: read
       contents: read
+      # Required for OIDC authentication with Scorecard
       id-token: write
 
     steps:
