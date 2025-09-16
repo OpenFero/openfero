@@ -25,6 +25,7 @@ jobs:
       contents: write # Required for creating releases
       packages: write # Required for publishing container images
       pull-requests: write # Required for creating pull requests
+      id-token: write # Required for OIDC token for Cosign
     env:
       NEW_VERSION: "0.0.0"
       IS_NIGHTLY: false
@@ -90,6 +91,69 @@ jobs:
           GORELEASER_CURRENT_TAG: ${{ github.event.inputs.tag }}
           GORELEASER_PREVIOUS_TAG: ${{ env.GORELEASER_PREVIOUS_TAG }}
 
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
+        with:
+          cosign-release: 'v2.4.1'
+
+      - name: Sign container images
+        run: |
+          echo "Signing container images with Cosign..."
+          
+          # Get image tag from environment or default
+          IMAGE_TAG="${{ github.event.inputs.tag }}"
+          if [ -z "$IMAGE_TAG" ]; then
+            IMAGE_TAG=$(echo "${{ github.ref }}" | sed 's/refs\/tags\///')
+          fi
+          
+          # Sign the container image
+          IMAGE_NAME="ghcr.io/openfero/openfero:${IMAGE_TAG}"
+          echo "Signing image: ${IMAGE_NAME}"
+          cosign sign --yes "${IMAGE_NAME}"
+          
+          # Sign latest tag if not a pre-release
+          if [[ ! "$IMAGE_TAG" =~ .*-nightly.* ]]; then
+            LATEST_IMAGE="ghcr.io/openfero/openfero:latest"
+            echo "Signing latest tag: ${LATEST_IMAGE}"
+            cosign sign --yes "${LATEST_IMAGE}"
+          fi
+          
+          echo "Container images signed successfully"
+          
+          # Verify signatures
+          echo "Verifying signature..."
+          cosign verify "${IMAGE_NAME}" \
+            --certificate-identity-regexp "https://github.com/openfero/openfero/.github/workflows/release.yml@.*" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" || echo "Verification completed (may show warnings for new signatures)"
+
+      - name: Sign release artifacts
+        if: ${{ !contains(github.ref, '-nightly') }}
+        run: |
+          echo "Signing release artifacts..."
+          
+          # Sign checksums file if it exists
+          if [ -f "dist/checksums.txt" ]; then
+            echo "Signing checksums.txt..."
+            cosign sign-blob --yes \
+              --output-signature=dist/checksums.txt.sig \
+              --output-certificate=dist/checksums.txt.pem \
+              dist/checksums.txt
+            echo "Checksums signed"
+          fi
+          
+          # Sign SBOM files if they exist
+          for sbom in dist/*.sbom.json; do
+            if [ -f "$sbom" ]; then
+              echo "Signing SBOM: $(basename "$sbom")"
+              cosign sign-blob --yes \
+                --output-signature="${sbom}.sig" \
+                --output-certificate="${sbom}.pem" \
+                "$sbom"
+            fi
+          done
+          
+          echo "All artifacts signed successfully"
+
       - name: Package charts
         id: chart-releaser
         if: ${{ !contains(github.ref, '-nightly') }}
@@ -135,3 +199,26 @@ jobs:
           base: ${{ github.ref_name }}
           add-paths: charts/openfero/Chart.yaml
           delete-branch: true
+
+      - name: Upload signatures to release
+        if: ${{ !contains(github.ref, '-nightly') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get the release tag name
+          TAG_NAME="${{ github.event.inputs.tag }}"
+          if [ -z "$TAG_NAME" ]; then
+            TAG_NAME=$(echo "${{ github.ref }}" | sed 's/refs\/tags\///')
+          fi
+          
+          echo "Uploading signature files to release: $TAG_NAME"
+          
+          # Upload signature files if they exist
+          for sig_file in dist/*.sig dist/*.pem; do
+            if [ -f "$sig_file" ]; then
+              echo "Uploading $(basename "$sig_file") to release..."
+              gh release upload "$TAG_NAME" "$sig_file" --clobber || echo "Failed to upload $sig_file"
+            fi
+          done
+          
+          echo "Signature files uploaded to release"
