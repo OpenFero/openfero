@@ -2,5 +2,5 @@ apiVersion: v2
 name: openfero
 description: OpenFero is intended as an event-triggered job scheduler framework for code agnostic recovery jobs.
 type: application
-version: 0.2.2
-appVersion: 0.15.0
+version: 0.2.3
+appVersion: 0.16.0-nightly.20250916-2
