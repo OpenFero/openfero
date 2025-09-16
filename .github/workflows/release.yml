@@ -63,10 +63,9 @@ jobs:
           prev_tag=$(git tag -l | sed 's/^v//' | sort -V | grep -Ev "(nightly|latest)" | tail -n 1)
           echo "GORELEASER_PREVIOUS_TAG=$prev_tag" >> "$GITHUB_ENV"
 
-      - name: Create tag
-        env:
-          TAG_NAME: ${{ github.event.inputs.tag }}
-        run: git tag "$TAG_NAME"
+      - name: Create tag (only for workflow_dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        run: git tag "${{ github.event.inputs.tag }}"
 
       - name: Set pre-release flag for nightly builds
         id: set-prerelease
