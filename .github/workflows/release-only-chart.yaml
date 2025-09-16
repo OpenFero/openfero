@@ -29,6 +29,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Log into registry ${{ env.REGISTRY }}
         if: github.event_name != 'pull_request'
@@ -46,17 +47,19 @@ jobs:
 
       - name: Package charts
         id: chart-releaser
+        env:
+          LATEST_RELEASE: ${{ steps.get_latest_release.outputs.latest_release }}
         run: |
-          sed -i "s/^appVersion: .*/appVersion: ${{ steps.get_latest_release.outputs.latest_release }}/g" charts/openfero/Chart.yaml
+          sed -i "s/^appVersion: .*/appVersion: ${LATEST_RELEASE}/g" charts/openfero/Chart.yaml
           helm package charts/* --destination .cr-release-packages
 
       - name: Push charts to GHCR
         id: push-charts
         run: |
-           shopt -s nullglob
-           for pkg in .cr-release-packages/*; do
-             if [ -z "${pkg:-}" ]; then
-               break
-             fi
-             helm push "${pkg}" "oci://ghcr.io/openfero/openfero/charts"
-           done
+          shopt -s nullglob
+          for pkg in .cr-release-packages/*; do
+            if [ -z "${pkg:-}" ]; then
+              break
+            fi
+            helm push "${pkg}" "oci://ghcr.io/openfero/openfero/charts"
+          done

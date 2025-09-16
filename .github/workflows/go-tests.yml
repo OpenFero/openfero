@@ -9,7 +9,7 @@ on:
       - "go.sum"
       - ".github/workflows/go-tests.yml"
   pull_request:
-    branches: ["main"] 
+    branches: ["main"]
     paths:
       - "**/*.go"
       - "go.mod"

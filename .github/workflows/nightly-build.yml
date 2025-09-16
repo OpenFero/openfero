@@ -2,7 +2,7 @@ name: Nightly build
 
 on:
   schedule:
-    - cron: '0 0 * * 5'
+    - cron: "0 0 * * 5"
   workflow_dispatch:
 
 # Default to read-only permissions
@@ -22,15 +22,14 @@ jobs:
         with:
           egress-policy: audit
 
-      -
-        name: 'Checkout'
+      - name: "Checkout"
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           token: ${{ secrets.NIGHTLY_BUILD_GH_TOKEN }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: 'Push new tag'
+      - name: "Push new tag"
         run: |
           git config user.name "${GITHUB_ACTOR}"
           git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
@@ -43,7 +42,7 @@ jobs:
           git tag -a "$TAG" -m "$TAG: nightly build"
           git push origin "$TAG"
 
-      - name: 'Clean up nightly releases'
+      - name: "Clean up nightly releases"
         uses: dev-drprasad/delete-older-releases@dfbe6be2a006e9475dfcbe5b8d201f1824c2a9fe # v0.3.4
         with:
           keep_latest: 2
@@ -53,11 +52,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.NIGHTLY_BUILD_GH_TOKEN }}
 
-      - name: 'Delete old nightly containers'
+      - name: "Delete old nightly containers"
         uses: snok/container-retention-policy@4f22ef80902ad409ed55a99dc5133cc1250a0d03 # v3.0.0
         with:
           account: OpenFero
           image-names: openfero
-          image-tags: '*-nightly*'
+          image-tags: "*-nightly*"
           cut-off: 2w
           token: ${{ secrets.NIGHTLY_BUILD_GH_TOKEN }}
