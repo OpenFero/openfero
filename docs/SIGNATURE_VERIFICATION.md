@@ -116,6 +116,7 @@ kubectl apply -f https://github.com/sigstore/policy-controller/releases/latest/d
 ```
 
 ### Create ClusterImagePolicy
+
 ```yaml
 apiVersion: policy.sigstore.dev/v1beta1
 kind: ClusterImagePolicy
@@ -123,17 +124,18 @@ metadata:
   name: openfero-policy
 spec:
   images:
-  - glob: "ghcr.io/openfero/openfero*"
+    - glob: "ghcr.io/openfero/openfero*"
   authorities:
-  - keyless:
-      identities:
-      - issuer: "https://token.actions.githubusercontent.com"
-        subject: "https://github.com/openfero/openfero/.github/workflows/release.yml@refs/tags/v*"
-      - issuer: "https://token.actions.githubusercontent.com"  
-        subject: "https://github.com/openfero/openfero/.github/workflows/nightly-build.yml@refs/heads/main"
+    - keyless:
+        identities:
+          - issuer: "https://token.actions.githubusercontent.com"
+            subject: "https://github.com/openfero/openfero/.github/workflows/release.yml@refs/tags/v*"
+          - issuer: "https://token.actions.githubusercontent.com"
+            subject: "https://github.com/openfero/openfero/.github/workflows/nightly-build.yml@refs/heads/main"
 ```
 
 Apply the policy:
+
 ```bash
 kubectl apply -f openfero-image-policy.yaml
 ```
@@ -175,6 +177,7 @@ spec:
 ## Manual Verification Examples
 
 ### Using Docker content trust
+
 ```bash
 # Enable content trust
 export DOCKER_CONTENT_TRUST=1
@@ -184,6 +187,7 @@ docker pull ghcr.io/openfero/openfero:latest
 ```
 
 ### Inspect signatures
+
 ```bash
 # Show signature details
 cosign tree ghcr.io/openfero/openfero:latest
@@ -208,7 +212,7 @@ cosign verify ghcr.io/openfero/openfero:latest \
 
 **"no matching signatures"**: The image might not be signed yet or you're using wrong certificate identity.
 
-**"certificate identity mismatch"**: Make sure you're using the correct workflow path in the certificate identity regex.
+**"certificate identity mismatch"**: Make sure you're using the correct workflow path in the certificate identity regular expression.
 
 **"OIDC issuer mismatch"**: Ensure you're using `https://token.actions.githubusercontent.com` as the issuer.
 

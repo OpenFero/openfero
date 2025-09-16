@@ -28,7 +28,7 @@ The OpenFero UI is available at `http://openfero-service:8080/` and provides:
 - Overview of all received alerts and their current status
 - Configuration viewer for operarios definitions
 
-#### Using curl
+#### Using cURL
 
 ```bash
 curl -X POST http://openfero-service:8080/alert \
