@@ -38,8 +38,10 @@ jobs:
             .github/workflows/go-tests.yml
 
       - name: Report changes
+        env:
+          GO_CHANGED: ${{ steps.changed-files.outputs.any_changed }}
         run: |
-          if [ "${{ steps.changed-files.outputs.any_changed }}" == "true" ]; then
+          if [ "$GO_CHANGED" == "true" ]; then
             echo "✓ Go files changed - will run tests"
           else
             echo "✓ No Go files changed - skipping tests"
