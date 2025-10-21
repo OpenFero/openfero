@@ -16,7 +16,6 @@ changelog:
     - title: 🏧 CI
       labels:
         - github_actions
-        - automation
     - title: Misc
       labels:
         - "*"
