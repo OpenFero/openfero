@@ -6,15 +6,15 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
-    groups:
-      github-actions:
-        patterns:
-          - "*"
+    labels:
+      - "github_actions"
 
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
       interval: "daily"
+    labels:
+      - "dependencies"
     groups:
       dependencies:
         patterns:
@@ -24,6 +24,8 @@ updates:
     directory: /
     schedule:
       interval: daily
+    labels:
+      - "dependencies"
     groups:
       dependencies:
         patterns:
