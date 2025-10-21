@@ -2,7 +2,8 @@
 
 Open Fero is a little play on words from the Latin "opem fero", which means "to help" and the term "OpenSource". Hence the name "openfero". The scope of OpenFero is a framework for self-healing in a cloud-native environment.
 
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/OpenFero/openfero/badge)](https://scorecard.dev/viewer/?uri=github.com/OpenFero/openfero) [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/6683/badge)](https://www.bestpractices.dev/projects/6683)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/OpenFero/openfero/badge)](https://scorecard.dev/viewer/?uri=github.com/OpenFero/openfero)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/6683/badge)](https://www.bestpractices.dev/projects/6683)
 
 ## Getting started
 
@@ -28,7 +29,7 @@ The OpenFero UI is available at `http://openfero-service:8080/` and provides:
 - Overview of all received alerts and their current status
 - Configuration viewer for operarios definitions
 
-#### Using curl
+#### Using cURL
 
 ```bash
 curl -X POST http://openfero-service:8080/alert \

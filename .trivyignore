@@ -1,0 +1,11 @@
+# Trivy ignore file for OpenFero
+# Documentation: https://aquasecurity.github.io/trivy/latest/docs/vulnerability/examples/filter/
+
+# AVD-KSV-0125: Container uses image from untrusted registry
+# Reason: GitHub Container Registry (ghcr.io) is a trusted registry for OpenFero project
+AVD-KSV-0125
+
+# AVD-KSV-0048: Role should not have broad access to resources  
+# Reason: OpenFero requires job creation permissions as an event-triggered job scheduler
+# The role is properly scoped to 'jobs' resources only in the 'batch' API group
+AVD-KSV-0048

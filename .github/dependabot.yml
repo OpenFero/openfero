@@ -6,11 +6,27 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    labels:
+      - "github_actions"
+
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
       interval: "daily"
+    labels:
+      - "dependencies"
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: daily
+    labels:
+      - "dependencies"
+    groups:
+      dependencies:
+        patterns:
+          - "*"

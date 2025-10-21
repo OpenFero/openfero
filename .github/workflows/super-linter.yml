@@ -9,20 +9,40 @@ name: Lint Code Base
 on:
   push:
     branches: ["main"]
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+      - "README*"
+      - "CHANGELOG*"
+      - "LICENSE*"
+      - "CONTRIBUTORS*"
+      - "AUTHORS*"
+      - "operarios/README.md"
   pull_request:
     branches: ["main"]
-permissions: # added using https://github.com/step-security/secure-workflows
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+      - "README*"
+      - "CHANGELOG*"
+      - "LICENSE*"
+      - "CONTRIBUTORS*"
+      - "AUTHORS*"
+      - "operarios/README.md"
+
+# Default to read-only permissions
+permissions:
   contents: read
 
 jobs:
   run-lint:
     permissions:
-      contents: read # for actions/checkout to fetch code
-      statuses: write # for github/super-linter to mark status of each linter run
+      contents: read # Required for actions/checkout to fetch code
+      statuses: write # Required for github/super-linter to mark status of each linter run
     runs-on: ubuntu-latest
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
         with:
           egress-policy: audit
 
@@ -31,9 +51,10 @@ jobs:
         with:
           # Full git history is needed to get a proper list of changed files within `super-linter`
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Lint Code Base
-        uses: super-linter/super-linter/slim@12150456a73e248bdc94d0794898f94e23127c88 # v7.4.0
+        uses: super-linter/super-linter/slim@ffde3b2b33b745cb612d787f669ef9442b1339a6 # v8.1.0
         env:
           VALIDATE_ALL_CODEBASE: false
           VALIDATE_CHECKOV: false
@@ -42,6 +63,7 @@ jobs:
           VALIDATE_GO: false # needs to be false if VALIDATE_GO_MODULES is true
           VALIDATE_JSX: false
           VALIDATE_CSS: false
+          TRIVY_CONFIG_FILE: "trivy.yaml"
           # GitLeaks configuration to exclude documentation files
           GITLEAKS_CONFIG_FILE: ".gitleaks.toml"
           KUBERNETES_KUBECONFORM_OPTIONS: "--ignore-missing-schemas --ignore-filename-pattern=charts/*"
