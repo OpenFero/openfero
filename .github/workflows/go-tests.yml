@@ -3,26 +3,54 @@ name: Go Tests
 on:
   push:
     branches: ["main"]
-    paths:
-      - "**/*.go"
-      - "go.mod"
-      - "go.sum"
-      - ".github/workflows/go-tests.yml"
   pull_request:
     branches: ["main"]
-    paths:
-      - "**/*.go"
-      - "go.mod"
-      - "go.sum"
-      - ".github/workflows/go-tests.yml"
 
 permissions:
   contents: read
 
 jobs:
+  check-changes:
+    name: Check for Go changes
+    runs-on: ubuntu-latest
+    outputs:
+      go_changed: ${{ steps.changed-files.outputs.any_changed }}
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0  # Required for changed-files detection
+
+      - name: Check for Go file changes
+        uses: tj-actions/changed-files@c3a1bb2c992d77180ae65be6ae6c166cf40f857c # v45.0.3
+        id: changed-files
+        with:
+          files: |
+            **/*.go
+            go.mod
+            go.sum
+            .github/workflows/go-tests.yml
+
+      - name: Report changes
+        run: |
+          if [ "${{ steps.changed-files.outputs.any_changed }}" == "true" ]; then
+            echo "✓ Go files changed - will run tests"
+            echo "Changed files: ${{ steps.changed-files.outputs.all_changed_files }}"
+          else
+            echo "✓ No Go files changed - skipping tests"
+          fi
+
   test:
     name: Run Go Tests
     runs-on: ubuntu-latest
+    needs: check-changes
+    if: needs.check-changes.outputs.go_changed == 'true'
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
