@@ -16,6 +16,13 @@ changelog:
     - title: 🏧 CI
       labels:
         - github_actions
+        - automation
+    - title: 📚 Documentation
+      labels:
+        - documentation
+    - title: 🐳 Docker
+      labels:
+        - docker
     - title: Misc
       labels:
         - "*"
