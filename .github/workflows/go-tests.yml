@@ -28,7 +28,7 @@ jobs:
           fetch-depth: 0 # Required for changed-files detection
 
       - name: Check for Go file changes
-        uses: tj-actions/changed-files@c3a1bb2c992d77180ae65be6ae6c166cf40f857c # v45.0.3
+        uses: tj-actions/changed-files@24d32ffd492484c1d75e0c0b894501ddb9d30d62 # v47.0.0
         id: changed-files
         with:
           files: |
