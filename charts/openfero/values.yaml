@@ -116,3 +116,10 @@ affinity: {}
 customArgs: []
   # - "--logLevel=debug"
   # - "--alertStoreType=memory"
+
+# Operarius CRD Configuration
+operarius:
+  # Enable Operarius CRD support
+  enabled: true
+  # Use Operarius CRDs instead of ConfigMaps for remediation jobs
+  useOperariusCRDs: true
