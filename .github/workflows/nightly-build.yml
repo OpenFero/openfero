@@ -53,7 +53,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.NIGHTLY_BUILD_GH_TOKEN }}
 
       - name: "Delete old nightly containers"
-        uses: snok/container-retention-policy@ecf5b93940203c938d0cff339c331cc0c3280e83 # v3.0.1
+        uses: snok/container-retention-policy@f54a5852bb9877fff77fca0b5048eda4bdd7d2b8 # v3.0.1
         with:
           account: OpenFero
           image-names: openfero
