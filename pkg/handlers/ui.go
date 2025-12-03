@@ -195,6 +195,77 @@ func (s *Server) JobsUIHandler(w http.ResponseWriter, r *http.Request) {
 		zap.Int("jobCount", len(jobInfos)))
 }
 
+// JobsAPIHandler handles GET requests to /api/jobs - returns JSON
+// @Summary Get all configured jobs
+// @Description Returns a list of all job definitions from ConfigMaps
+// @Tags jobs
+// @Produce json
+// @Success 200 {array} models.JobInfo
+// @Router /api/jobs [get]
+func (s *Server) JobsAPIHandler(w http.ResponseWriter, r *http.Request) {
+	log.Debug("Processing jobs API request",
+		zap.String("path", r.URL.Path),
+		zap.String("method", r.Method),
+		zap.String("remoteAddr", r.RemoteAddr))
+
+	// Get all ConfigMaps from store
+	configMaps := s.KubeClient.ConfigMapStore.List()
+	log.Debug("Retrieved ConfigMaps from store", zap.Int("count", len(configMaps)))
+
+	var jobInfos []models.JobInfo
+	for _, obj := range configMaps {
+		configMap := obj.(*corev1.ConfigMap)
+
+		// Process each job definition in ConfigMap
+		for name, jobDef := range configMap.Data {
+			log.Debug("Processing job definition",
+				zap.String("configMap", configMap.Name),
+				zap.String("jobName", name))
+
+			// Parse YAML job definition
+			yamlJobDefinition := []byte(jobDef)
+			jsonBytes, err := yaml.YAMLToJSON(yamlJobDefinition)
+			if err != nil {
+				log.Error("Failed to convert YAML job definition to JSON",
+					zap.String("configMap", configMap.Name),
+					zap.String("jobName", name),
+					zap.Error(err))
+				continue
+			}
+
+			jobObject := &batchv1.Job{}
+			if err := json.Unmarshal(jsonBytes, jobObject); err != nil {
+				log.Error("Failed to unmarshal job definition",
+					zap.String("configMap", configMap.Name),
+					zap.String("jobName", name),
+					zap.Error(err))
+				continue
+			}
+
+			// Extract container image
+			if len(jobObject.Spec.Template.Spec.Containers) > 0 {
+				image := jobObject.Spec.Template.Spec.Containers[0].Image
+				jobInfos = append(jobInfos, models.JobInfo{
+					ConfigMapName: configMap.Name,
+					JobName:       name,
+					Image:         image,
+				})
+			}
+		}
+	}
+
+	w.Header().Set(ContentTypeHeader, ApplicationJSONVal)
+	if err := json.NewEncoder(w).Encode(jobInfos); err != nil {
+		log.Error("Failed to encode jobs response", zap.Error(err))
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+
+	log.Debug("Jobs API request completed successfully",
+		zap.String("path", r.URL.Path),
+		zap.Int("jobCount", len(jobInfos)))
+}
+
 // AssetsHandler serves static assets
 func AssetsHandler(w http.ResponseWriter, r *http.Request) {
 	log.Debug("Serving asset", zap.String("path", r.URL.Path))

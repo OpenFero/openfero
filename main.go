@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"flag"
 	"fmt"
 	"net/http"
@@ -12,6 +13,8 @@ import (
 	"github.com/OpenFero/openfero/pkg/kubernetes"
 	log "github.com/OpenFero/openfero/pkg/logging"
 	"github.com/OpenFero/openfero/pkg/metadata"
+	"github.com/OpenFero/openfero/pkg/models"
+	"github.com/OpenFero/openfero/pkg/services"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 	"go.uber.org/zap"
@@ -22,6 +25,9 @@ import (
 	"github.com/OpenFero/openfero/pkg/alertstore/memberlist"
 	"github.com/OpenFero/openfero/pkg/alertstore/memory"
 )
+
+//go:embed frontend/dist
+var frontendFS embed.FS
 
 var (
 	version = "dev"
@@ -204,6 +210,12 @@ func main() {
 	// Pass build information to handlers
 	handlers.SetBuildInfo(version, commit, date)
 
+	// Initialize WebSocket hub and set alert broadcaster
+	wsHub := handlers.GetWSHub()
+	services.SetAlertBroadcaster(func(entry models.AlertStoreEntry) {
+		wsHub.Broadcast("alert", entry)
+	})
+
 	// Register metrics and set prometheus handler
 	metadata.AddMetricsToPrometheusRegistry()
 	http.HandleFunc("GET "+metadata.MetricsPath, func(w http.ResponseWriter, r *http.Request) {
@@ -221,16 +233,29 @@ func main() {
 	authMiddleware := handlers.AuthMiddleware(authConfig)
 	http.HandleFunc("POST /alerts", authMiddleware(server.AlertsPostHandler))
 
-	// Other routes remain unprotected
-	http.HandleFunc("GET /", handlers.UIHandler)
-	http.HandleFunc("GET /jobs", server.JobsUIHandler)
+	// API routes (JSON)
+	http.HandleFunc("GET /api/jobs", server.JobsAPIHandler)
+	http.HandleFunc("GET /api/alerts", server.AlertStoreGetHandler) // Alias for /alertStore
+	http.HandleFunc("GET /api/about", handlers.AboutAPIHandler)
+	http.HandleFunc("GET /api/ws", handlers.WebSocketHandler) // WebSocket for real-time updates
+
+	// Legacy UI routes (HTML) - kept for backward compatibility
+	http.HandleFunc("GET /ui/", handlers.UIHandler)
+	http.HandleFunc("GET /ui/jobs", server.JobsUIHandler)
 	http.HandleFunc("GET /about", handlers.AboutHandler)
-	http.HandleFunc("GET /assets/", handlers.AssetsHandler)
+	http.HandleFunc("GET /legacy-assets/", handlers.AssetsHandler) // Old HTMX assets
+
+	// Swagger documentation
 	http.Handle("GET /swagger/", httpSwagger.Handler(
 		httpSwagger.DeepLinking(true),
 		httpSwagger.DocExpansion("none"),
 		httpSwagger.DomID("swagger-ui"),
 	))
+
+	// Vue.js SPA - serve frontend for all unmatched routes
+	// This must be registered last as a catch-all
+	frontendHandler := handlers.NewFrontendHandler(frontendFS)
+	http.Handle("GET /", frontendHandler)
 
 	// Create and start HTTP server
 	srv := &http.Server{

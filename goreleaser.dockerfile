@@ -11,7 +11,6 @@ EXPOSE 8080
 WORKDIR /app
 
 COPY openfero /app/
-COPY web/ /app/web/
 COPY --from=build-env /etc/passwd_single /etc/passwd
 COPY --from=build-env /etc/group_single /etc/group
 USER 10001
