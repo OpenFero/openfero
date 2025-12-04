@@ -18,7 +18,7 @@ applyTo: "frontend/**"
 
 ## Project Structure
 
-```
+```text
 frontend/
 ├── src/
 │   ├── api/                 # API client functions

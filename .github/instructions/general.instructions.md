@@ -17,7 +17,7 @@ OpenFero is a Kubernetes-native self-healing framework that receives Alertmanage
 
 **Architecture Flow**:
 
-```
+```text
 Alertmanager webhook → OpenFero /api/alerts → ConfigMap/Operarius lookup → K8s Job creation → SSE broadcast → Vue.js UI update
 ```
 
@@ -27,7 +27,7 @@ Alertmanager webhook → OpenFero /api/alerts → ConfigMap/Operarius lookup →
 
 ConfigMaps MUST follow this exact format:
 
-```
+```text
 openfero-<alertname>-<status>
 ```
 
