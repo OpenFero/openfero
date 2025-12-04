@@ -740,11 +740,11 @@ func TestOperariusService_CreateJobFromOperarius_Variations(t *testing.T) {
 	enabled := true
 
 	tests := []struct {
-		name           string
-		operarius      *operariusv1alpha1.Operarius
-		hookMessage    models.HookMessage
-		checkJob       func(t *testing.T, job *batchv1.Job)
-		wantErr        bool
+		name        string
+		operarius   *operariusv1alpha1.Operarius
+		hookMessage models.HookMessage
+		checkJob    func(t *testing.T, job *batchv1.Job)
+		wantErr     bool
 	}{
 		{
 			name: "multiple containers in job template",

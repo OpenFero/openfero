@@ -13,16 +13,16 @@ The Operarius CRD implementation in OpenFero follows Kubernetes best practices f
 type OperariusSpec struct {
     // JobTemplate defines the job to create for remediation
     JobTemplate batchv1.JobTemplateSpec `json:"jobTemplate"`
-    
+
     // AlertSelector specifies which alerts this operarius handles
     AlertSelector AlertSelector `json:"alertSelector"`
-    
+
     // Priority determines selection when multiple operarii match (higher wins)
     Priority int32 `json:"priority,omitempty"`
-    
+
     // Enabled controls whether this operarius is active
     Enabled *bool `json:"enabled,omitempty"`
-    
+
     // Deduplication prevents duplicate job execution
     Deduplication *DeduplicationConfig `json:"deduplication,omitempty"`
 }
@@ -66,17 +66,20 @@ s.handleWithConfigMap(ctx, hookMessage)
 ### Setting Up Development Environment
 
 1. **Install controller-tools**:
+
    ```bash
    go install sigs.k8s.io/controller-tools/cmd/controller-gen@latest
    ```
 
 2. **Generate code and manifests**:
+
    ```bash
    make generate  # Generate DeepCopy methods
    make manifests # Generate CRD YAML
    ```
 
 3. **Install CRDs in cluster**:
+
    ```bash
    make install-crds
    ```
@@ -140,21 +143,24 @@ logger.V(1).Info("Processing alert", "alertname", alert.Labels["alertname"])
 #### Common Issues
 
 1. **CRD Schema Validation Errors**:
+
    ```bash
    # Check CRD schema
    kubectl explain operarius.spec.jobTemplate.spec
-   
+
    # Validate against schema
    kubectl --dry-run=client apply -f operarius.yaml
    ```
 
 2. **Template Rendering Errors**:
+
    ```go
    // Add debug output in template processing
    logger.V(1).Info("Template variables", "variables", templateVars)
    ```
 
 3. **RBAC Issues**:
+
    ```bash
    # Check permissions
    kubectl auth can-i create jobs --as=system:serviceaccount:openfero:default
@@ -183,10 +189,10 @@ Implement status subresource:
 type OperariusStatus struct {
     // Conditions represent the latest available observations
     Conditions []metav1.Condition `json:"conditions,omitempty"`
-    
+
     // ExecutionCount tracks how many jobs were created
     ExecutionCount int64 `json:"executionCount,omitempty"`
-    
+
     // LastExecution records the last job creation time
     LastExecution *metav1.Time `json:"lastExecution,omitempty"`
 }
@@ -252,6 +258,7 @@ func (s *OperariusService) HealthCheck(ctx context.Context) error {
 ### Code Style
 
 1. **Follow Go conventions**:
+
    - Use gofmt and golint
    - Write clear, descriptive names
    - Add comments for exported functions
@@ -292,24 +299,24 @@ spec:
       template:
         spec:
           # Standard Kubernetes Job spec
-          
+
   # Required: Defines which alerts trigger this operarius
   alertSelector:
-    alertname: "string"      # Required
-    status: "firing"         # Optional: "firing" or "resolved"
-    labels:                  # Optional: additional label matching
+    alertname: "string" # Required
+    status: "firing" # Optional: "firing" or "resolved"
+    labels: # Optional: additional label matching
       key: "value"
-      
+
   # Optional: Priority for selection (default: 0)
   priority: 50
-  
+
   # Optional: Enable/disable this operarius (default: true)
   enabled: true
-  
+
   # Optional: Deduplication configuration
   deduplication:
     enabled: true
-    ttl: 300  # seconds
+    ttl: 300 # seconds
 
 status:
   conditions: []
@@ -323,10 +330,10 @@ status:
 type AlertSelector struct {
     // Alertname matches the alert name (required)
     Alertname string `json:"alertname"`
-    
+
     // Status matches alert status: "firing" or "resolved" (optional)
     Status string `json:"status,omitempty"`
-    
+
     // Labels provides additional label matching (optional)
     Labels map[string]string `json:"labels,omitempty"`
 }

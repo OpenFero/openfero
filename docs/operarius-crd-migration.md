@@ -7,17 +7,20 @@ This guide covers the migration from ConfigMap-based remediation jobs to Operari
 ## Benefits of Operarius CRDs
 
 ### 1. Schema Validation
+
 - **Compile-time validation** of job definitions
 - **IDE support** with autocompletion
 - **kubectl explain** support for built-in documentation
 - **Admission webhooks** for advanced validation
 
 ### 2. API Compatibility
+
 - **100% Kubernetes Job API compatibility** - uses embedded `JobTemplateSpec`
 - **Native Kubernetes workflows** - standard kubectl, YAML, etc.
 - **Declarative management** with GitOps support
 
 ### 3. Enhanced Features
+
 - **Priority-based selection** when multiple operarii match
 - **Deduplication** to prevent duplicate job execution
 - **Status tracking** with conditions and execution history
@@ -39,6 +42,7 @@ kubectl get crd operariuses.openfero.io
 ### Step 2: Convert ConfigMaps to Operarius CRDs
 
 #### Before (ConfigMap):
+
 ```yaml
 apiVersion: v1
 kind: ConfigMap
@@ -53,6 +57,7 @@ data:
 ```
 
 #### After (Operarius CRD):
+
 ```yaml
 apiVersion: openfero.io/v1alpha1
 kind: Operarius
@@ -63,7 +68,7 @@ spec:
   alertSelector:
     alertname: PodCrashLooping
     status: firing
-  
+
   jobTemplate:
     spec:
       backoffLimit: 2
@@ -73,13 +78,13 @@ spec:
           restartPolicy: Never
           serviceAccountName: openfero-remediation
           containers:
-          - name: pod-restarter
-            image: bitnami/kubectl:latest
-            command:
-            - /bin/sh
-            - -c
-            - kubectl delete pod {{ .Alert.Labels.pod }} -n {{ .Alert.Labels.namespace }}
-  
+            - name: pod-restarter
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/sh
+                - -c
+                - kubectl delete pod {{ .Alert.Labels.pod }} -n {{ .Alert.Labels.namespace }}
+
   priority: 50
   enabled: true
 ```
@@ -103,6 +108,7 @@ server := &handlers.Server{
 ### Step 4: Test the Migration
 
 1. **Apply test Operarius**:
+
    ```bash
    kubectl apply -f config/samples/openfero_v1alpha1_operarius_podrestart.yaml
    ```
@@ -110,6 +116,7 @@ server := &handlers.Server{
 2. **Trigger a test alert** and verify job creation
 
 3. **Check Operarius status**:
+
    ```bash
    kubectl get operarius -A
    kubectl describe operarius podcrashlooping-operarius
@@ -132,6 +139,7 @@ kubectl delete configmap openfero-podcrashlooping-firing
 Both ConfigMap and CRD approaches support the same template variables:
 
 ### Alert Data
+
 - `{{ .Alert.Labels.* }}` - Alert labels (e.g., `{{ .Alert.Labels.pod }}`)
 - `{{ .Alert.Annotations.* }}` - Alert annotations
 - `{{ .HookMessage.Status }}` - Alert status (firing/resolved)
@@ -140,14 +148,15 @@ Both ConfigMap and CRD approaches support the same template variables:
 - `{{ .Status }}` - Shorthand for alert status
 
 ### Example Usage
+
 ```yaml
 env:
-- name: POD_NAME
-  value: "{{ .Alert.Labels.pod }}"
-- name: NAMESPACE
-  value: "{{ .Alert.Labels.namespace }}"
-- name: ALERT_STATUS
-  value: "{{ .Status }}"
+  - name: POD_NAME
+    value: "{{ .Alert.Labels.pod }}"
+  - name: NAMESPACE
+    value: "{{ .Alert.Labels.namespace }}"
+  - name: ALERT_STATUS
+    value: "{{ .Status }}"
 ```
 
 ## Advanced Features
@@ -158,13 +167,13 @@ When multiple Operarii match an alert, the one with the highest priority is sele
 
 ```yaml
 spec:
-  priority: 100  # Higher priority operarius
+  priority: 100 # Higher priority operarius
   alertSelector:
     alertname: DiskSpaceLow
     status: firing
 ---
 spec:
-  priority: 50   # Lower priority fallback
+  priority: 50 # Lower priority fallback
   alertSelector:
     alertname: DiskSpaceLow
     status: firing
@@ -178,7 +187,7 @@ Prevent duplicate job execution for the same alert group:
 spec:
   deduplication:
     enabled: true
-    ttl: 300  # Don't create duplicate jobs for 5 minutes
+    ttl: 300 # Don't create duplicate jobs for 5 minutes
 ```
 
 ### Label Matching
@@ -235,17 +244,20 @@ kubectl get jobs -l openfero.io/managed-by=openfero -w
 ### Common Issues
 
 1. **CRD not found**
+
    ```bash
    # Install CRDs
    make install-crds
    ```
 
 2. **No matching Operarius**
+
    - Check alert selector criteria
    - Verify operarius is enabled
    - Check logs: `kubectl logs -l app=openfero`
 
 3. **Job not created**
+
    - Check deduplication settings
    - Verify RBAC permissions
    - Check template variables are valid
@@ -276,6 +288,7 @@ kubectl get operarius -o jsonpath='{.status.conditions}'
 If you need to rollback to ConfigMap mode:
 
 1. **Disable CRD mode**:
+
    ```go
    server.UseOperariusCRDs = false
    ```
@@ -287,11 +300,13 @@ If you need to rollback to ConfigMap mode:
 ## Best Practices
 
 ### 1. Naming Convention
+
 - Use descriptive names: `kubequota-remediation-operarius`
 - Include alert name: `podcrashlooping-operarius`
 - Avoid special characters
 
 ### 2. Resource Management
+
 ```yaml
 spec:
   jobTemplate:
@@ -299,31 +314,33 @@ spec:
       template:
         spec:
           containers:
-          - name: remediation
-            resources:
-              requests:
-                memory: "64Mi"
-                cpu: "50m"
-              limits:
-                memory: "128Mi"
-                cpu: "100m"
+            - name: remediation
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "100m"
 ```
 
 ### 3. Job Cleanup
+
 ```yaml
 spec:
   jobTemplate:
     spec:
-      ttlSecondsAfterFinished: 3600  # Clean up after 1 hour
-      activeDeadlineSeconds: 300     # 5 minute timeout
+      ttlSecondsAfterFinished: 3600 # Clean up after 1 hour
+      activeDeadlineSeconds: 300 # 5 minute timeout
 ```
 
 ### 4. Error Handling
+
 ```yaml
 spec:
   jobTemplate:
     spec:
-      backoffLimit: 3  # Retry up to 3 times
+      backoffLimit: 3 # Retry up to 3 times
 ```
 
 ## Migration Checklist

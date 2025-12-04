@@ -68,7 +68,7 @@ spec:
   alertSelector:
     alertname: PodCrashLooping
     status: firing
-  
+
   jobTemplate:
     spec:
       template:
@@ -76,18 +76,19 @@ spec:
           restartPolicy: Never
           serviceAccountName: openfero-remediation
           containers:
-          - name: pod-restarter
-            image: bitnami/kubectl:latest
-            command:
-            - /bin/sh
-            - -c
-            - kubectl delete pod {{ .Alert.Labels.pod }} -n {{ .Alert.Labels.namespace }}
-  
+            - name: pod-restarter
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/sh
+                - -c
+                - kubectl delete pod {{ .Alert.Labels.pod }} -n {{ .Alert.Labels.namespace }}
+
   priority: 50
   enabled: true
 ```
 
 **Benefits of Operarius CRDs:**
+
 - Schema validation and IDE support
 - Priority-based selection when multiple operarii match
 - Deduplication to prevent duplicate job execution
@@ -102,10 +103,12 @@ See the [Operarius CRD Documentation](docs/operarius-crds.md) for complete detai
 The traditional approach stores operarios definitions in ConfigMaps with the naming convention `openfero-<alertname>-<status>`:
 
 #### Example Names
+
 - `openfero-KubeQuotaAlmostReached-firing`
 - `openfero-KubeQuotaAlmostReached-resolved`
 
 #### ConfigMap Example
+
 ```yaml
 apiVersion: v1
 kind: ConfigMap

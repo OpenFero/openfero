@@ -10,7 +10,7 @@ spec:
   alertSelector:
     alertname: PodCrashLooping
     status: firing
-  
+
   jobTemplate:
     metadata:
       labels:
@@ -21,9 +21,9 @@ spec:
         description: "Restart pod for CrashLooping alert"
     spec:
       backoffLimit: 2
-      ttlSecondsAfterFinished: 600  # Clean up after 10 minutes
-      activeDeadlineSeconds: 120     # 2 minute timeout
-      
+      ttlSecondsAfterFinished: 600 # Clean up after 10 minutes
+      activeDeadlineSeconds: 120 # 2 minute timeout
+
       template:
         metadata:
           labels:
@@ -33,42 +33,42 @@ spec:
           restartPolicy: Never
           serviceAccountName: openfero-remediation
           containers:
-          - name: pod-restarter
-            image: bitnami/kubectl:latest
-            env:
-            - name: POD_NAME
-              value: "{{ .Alert.Labels.pod }}"
-            - name: POD_NAMESPACE
-              value: "{{ .Alert.Labels.namespace }}"
-            - name: CONTAINER_NAME
-              value: "{{ .Alert.Labels.container }}"
-            command:
-            - /bin/sh
-            - -c
-            - |
-              echo "Restarting pod $POD_NAME in namespace $POD_NAMESPACE"
-              
-              # Log current pod status
-              kubectl get pod $POD_NAME -n $POD_NAMESPACE -o yaml
-              
-              # Delete the pod to trigger restart
-              kubectl delete pod $POD_NAME -n $POD_NAMESPACE
-              
-              # Wait a bit and check if new pod is starting
-              sleep 10
-              echo "Pod restart initiated. New pod status:"
-              kubectl get pods -n $POD_NAMESPACE -l app=$POD_NAME
-            resources:
-              requests:
-                memory: "32Mi"
-                cpu: "25m"
-              limits:
-                memory: "64Mi"
-                cpu: "50m"
-  
+            - name: pod-restarter
+              image: bitnami/kubectl:latest
+              env:
+                - name: POD_NAME
+                  value: "{{ .Alert.Labels.pod }}"
+                - name: POD_NAMESPACE
+                  value: "{{ .Alert.Labels.namespace }}"
+                - name: CONTAINER_NAME
+                  value: "{{ .Alert.Labels.container }}"
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  echo "Restarting pod $POD_NAME in namespace $POD_NAMESPACE"
+
+                  # Log current pod status
+                  kubectl get pod $POD_NAME -n $POD_NAMESPACE -o yaml
+
+                  # Delete the pod to trigger restart
+                  kubectl delete pod $POD_NAME -n $POD_NAMESPACE
+
+                  # Wait a bit and check if new pod is starting
+                  sleep 10
+                  echo "Pod restart initiated. New pod status:"
+                  kubectl get pods -n $POD_NAMESPACE -l app=$POD_NAME
+              resources:
+                requests:
+                  memory: "32Mi"
+                  cpu: "25m"
+                limits:
+                  memory: "64Mi"
+                  cpu: "50m"
+
   deduplication:
     enabled: true
-    ttl: 600  # Don't restart same pod for 10 minutes
-  
+    ttl: 600 # Don't restart same pod for 10 minutes
+
   priority: 50
   enabled: true
