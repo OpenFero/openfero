@@ -50,7 +50,7 @@ cosign verify ghcr.io/openfero/openfero:latest \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
 ```
 
-- Certificate identity regexp: `https://github.com/OpenFero/openfero/.*` (note capital F)
+- Certificate identity regular expression: `https://github.com/OpenFero/openfero/.*` (note capital F)
 - Transparency log: Rekor for public verification
 
 ### Helm Charts

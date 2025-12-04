@@ -63,7 +63,7 @@ openfero-<alertname>-<status>
 ### Infrastructure
 
 - `charts/openfero/`: Helm chart with CRDs, RBAC, deployment
-- `operarios/`: Example worker images (documented in README)
+- `operarios/`: Example worker images (documented in operarios/readme)
 
 ## Conventions to Follow
 
