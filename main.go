@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"flag"
 	"fmt"
@@ -110,6 +111,10 @@ func main() {
 	authOAuth2Issuer := flag.String("authOAuth2Issuer", "", "OAuth2 token issuer URL")
 	authOAuth2Audience := flag.String("authOAuth2Audience", "", "OAuth2 token audience")
 
+	// Operarius CRD flags
+	useOperariusCRDs := flag.Bool("useOperariusCRDs", false, "use Operarius CRDs instead of ConfigMaps for remediation jobs")
+	operariusNamespace := flag.String("operariusNamespace", "", "Kubernetes namespace to watch for Operarius CRDs (defaults to configmapNamespace)")
+
 	flag.Parse()
 
 	// Configure logger first
@@ -153,6 +158,11 @@ func main() {
 
 	if *jobDestinationNamespace == "" {
 		jobDestinationNamespace = &currentNamespace
+	}
+
+	// Set operarius namespace to configmap namespace if not specified
+	if *operariusNamespace == "" {
+		operariusNamespace = configmapNamespace
 	}
 
 	// Parse label selector
@@ -205,6 +215,34 @@ func main() {
 		KubeClient: kubeClient,
 		AlertStore: store,
 		AuthConfig: authConfig,
+	}
+
+	// Initialize Operarius CRD support if enabled
+	if *useOperariusCRDs {
+		log.Info("Operarius CRD mode enabled",
+			zap.String("namespace", *operariusNamespace))
+
+		operariusClient, err := kubernetes.NewOperariusClient(kubeconfig, *operariusNamespace)
+		if err != nil {
+			log.Fatal("Failed to create Operarius client", zap.Error(err))
+		}
+
+		// Initialize informer and wait for cache sync
+		ctx := context.Background()
+		_, err = operariusClient.InitOperariusInformer(ctx, nil)
+		if err != nil {
+			log.Warn("Failed to initialize Operarius informer, falling back to API calls",
+				zap.Error(err))
+		}
+
+		// Create OperariusService and wire it up
+		operariusService := services.NewOperariusServiceWithClient(&kubeClient.Clientset, operariusClient)
+		server.OperariusService = operariusService
+		server.UseOperariusCRDs = true
+
+		log.Info("Operarius CRD support initialized successfully")
+	} else {
+		log.Info("Using ConfigMap-based remediation jobs (legacy mode)")
 	}
 
 	// Pass build information to handlers

@@ -14,19 +14,30 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	operariusv1alpha1 "github.com/OpenFero/openfero/api/v1alpha1"
+	k8sclient "github.com/OpenFero/openfero/pkg/kubernetes"
+	log "github.com/OpenFero/openfero/pkg/logging"
 	"github.com/OpenFero/openfero/pkg/models"
+	"go.uber.org/zap"
 )
 
 // OperariusService handles Operarius CRD-based job creation
 type OperariusService struct {
-	kubeClient kubernetes.Interface
-	// operariusClient will be added when we implement the client
+	kubeClient       kubernetes.Interface
+	operariusClient  *k8sclient.OperariusClient
 }
 
 // NewOperariusService creates a new OperariusService
 func NewOperariusService(kubeClient kubernetes.Interface) *OperariusService {
 	return &OperariusService{
 		kubeClient: kubeClient,
+	}
+}
+
+// NewOperariusServiceWithClient creates a new OperariusService with an Operarius client
+func NewOperariusServiceWithClient(kubeClient kubernetes.Interface, operariusClient *k8sclient.OperariusClient) *OperariusService {
+	return &OperariusService{
+		kubeClient:      kubeClient,
+		operariusClient: operariusClient,
 	}
 }
 
@@ -302,9 +313,75 @@ func (s *OperariusService) CheckDeduplication(ctx context.Context, operarius *op
 }
 
 // GetOperariiForNamespace retrieves all Operarii in a namespace
-// This is a placeholder - in reality you'd use a controller-runtime client
 func (s *OperariusService) GetOperariiForNamespace(ctx context.Context, namespace string) ([]operariusv1alpha1.Operarius, error) {
-	// TODO: Implement with controller-runtime client once we set that up
-	// For now, return empty list
-	return []operariusv1alpha1.Operarius{}, nil
+	// Check if we have an Operarius client configured
+	if s.operariusClient == nil {
+		log.Debug("No Operarius client configured, returning empty list")
+		return []operariusv1alpha1.Operarius{}, nil
+	}
+
+	// Try to get from cache first
+	operarii, err := s.operariusClient.List()
+	if err != nil {
+		log.Warn("Failed to list Operarii from cache, trying API",
+			zap.Error(err))
+		// Fallback to direct API call
+		operarii, err = s.operariusClient.ListFromAPI(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list Operarii: %w", err)
+		}
+	}
+
+	log.Debug("Retrieved Operarii",
+		zap.String("namespace", namespace),
+		zap.Int("count", len(operarii)))
+
+	return operarii, nil
+}
+
+// UpdateOperariusStatus updates the status of an Operarius after job creation
+func (s *OperariusService) UpdateOperariusStatus(ctx context.Context, operarius *operariusv1alpha1.Operarius, jobName string) error {
+	if s.operariusClient == nil {
+		log.Debug("No Operarius client configured, skipping status update")
+		return nil
+	}
+
+	// Update status fields
+	now := metav1.Now()
+	operarius.Status.ExecutionCount++
+	operarius.Status.LastExecutionTime = &now
+	operarius.Status.LastExecutedJobName = jobName
+
+	// Update condition to Ready
+	readyCondition := operariusv1alpha1.OperariusCondition{
+		Type:               operariusv1alpha1.OperariusConditionReady,
+		Status:             metav1.ConditionTrue,
+		LastTransitionTime: now,
+		Reason:             "JobCreated",
+		Message:            fmt.Sprintf("Successfully created job %s", jobName),
+	}
+	operarius.Status.Conditions = updateConditions(operarius.Status.Conditions, readyCondition)
+
+	// Update via API
+	if err := s.operariusClient.UpdateStatus(ctx, operarius); err != nil {
+		return fmt.Errorf("failed to update Operarius status: %w", err)
+	}
+
+	log.Info("Updated Operarius status",
+		zap.String("operarius", operarius.Name),
+		zap.String("jobName", jobName),
+		zap.Int32("executionCount", operarius.Status.ExecutionCount))
+
+	return nil
+}
+
+// updateConditions updates or adds a condition to the conditions slice
+func updateConditions(conditions []operariusv1alpha1.OperariusCondition, newCondition operariusv1alpha1.OperariusCondition) []operariusv1alpha1.OperariusCondition {
+	for i, c := range conditions {
+		if c.Type == newCondition.Type {
+			conditions[i] = newCondition
+			return conditions
+		}
+	}
+	return append(conditions, newCondition)
 }

@@ -59,6 +59,10 @@ spec:
             {{- if include "openfero.shouldSetAlertStoreType" . }}
             - "--alertStoreType=memberlist"
             {{- end }}
+            {{- if and .Values.operarius.enabled .Values.operarius.useOperariusCRDs }}
+            - "--useOperariusCRDs=true"
+            - "--operariusNamespace={{ .Release.Namespace }}"
+            {{- end }}
             {{- with .Values.customArgs }}
             {{- toYaml . | nindent 12 }}
             {{- end }}

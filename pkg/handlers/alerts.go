@@ -144,6 +144,14 @@ func (s *Server) handleOperariusBasedJobs(ctx context.Context, hookMessage model
 		zap.String("namespace", job.Namespace),
 		zap.String("groupKey", hookMessage.GroupKey))
 
+	// Update Operarius status with execution info
+	if err := s.OperariusService.UpdateOperariusStatus(ctx, operarius, job.Name); err != nil {
+		log.Warn("Failed to update Operarius status",
+			zap.Error(err),
+			zap.String("operarius", operarius.Name))
+		// Don't return - job was created successfully, status update is best-effort
+	}
+
 	// Store alert in alert store for tracking
 	for _, alert := range hookMessage.Alerts {
 		jobInfo := &alertstore.JobInfo{
