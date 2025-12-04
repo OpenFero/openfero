@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"html/template"
 	"net/http"
 
@@ -10,9 +11,9 @@ import (
 
 // BuildInfo contains information about the build
 type BuildInfo struct {
-	Version   string
-	Commit    string
-	BuildDate string
+	Version   string `json:"version"`
+	Commit    string `json:"commit"`
+	BuildDate string `json:"buildDate"`
 }
 
 // Global variable to store build information
@@ -69,4 +70,26 @@ func AboutHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Debug("About page request completed successfully",
 		zap.String("path", r.URL.Path))
+}
+
+// AboutAPIHandler handles GET requests to /api/about - returns JSON
+// @Summary Get build information
+// @Description Returns version, commit hash, and build date
+// @Tags about
+// @Produce json
+// @Success 200 {object} BuildInfo
+// @Router /api/about [get]
+func AboutAPIHandler(w http.ResponseWriter, r *http.Request) {
+	log.Debug("Processing about API request",
+		zap.String("path", r.URL.Path),
+		zap.String("method", r.Method))
+
+	w.Header().Set(ContentTypeHeader, ApplicationJSONVal)
+	if err := json.NewEncoder(w).Encode(buildInformation); err != nil {
+		log.Error("Failed to encode build info", zap.Error(err))
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+
+	log.Debug("About API request completed successfully")
 }

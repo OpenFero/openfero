@@ -4,6 +4,7 @@ go 1.25.1
 
 require (
 	github.com/ghodss/yaml v1.0.0
+	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/hashicorp/memberlist v0.5.3
 	github.com/stretchr/testify v1.11.1
 	github.com/swaggo/swag v1.16.6

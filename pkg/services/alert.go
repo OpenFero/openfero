@@ -14,6 +14,35 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+// AlertBroadcastFunc is a callback function for broadcasting alert updates
+type AlertBroadcastFunc func(entry models.AlertStoreEntry)
+
+// alertBroadcaster is the function called when alerts are saved
+var alertBroadcaster AlertBroadcastFunc
+
+// SetAlertBroadcaster sets the function to be called when alerts are saved
+func SetAlertBroadcaster(fn AlertBroadcastFunc) {
+	alertBroadcaster = fn
+}
+
+// broadcastAlert calls the broadcaster if set
+func broadcastAlert(alert models.Alert, status string, jobInfo *alertstore.JobInfo) {
+	if alertBroadcaster != nil {
+		entry := models.AlertStoreEntry{
+			Alert:  alert,
+			Status: status,
+		}
+		if jobInfo != nil {
+			entry.JobInfo = &models.JobInfo{
+				ConfigMapName: jobInfo.ConfigMapName,
+				JobName:       jobInfo.JobName,
+				Image:         jobInfo.Image,
+			}
+		}
+		alertBroadcaster(entry)
+	}
+}
+
 // CheckAlertStatus checks if alert status is valid
 func CheckAlertStatus(status string) bool {
 	return status == "resolved" || status == "firing"
@@ -33,7 +62,11 @@ func SaveAlert(alertStore alertstore.Store, alert models.Alert, status string) {
 			zap.String("alertname", alert.Labels["alertname"]),
 			zap.String("status", status),
 			zap.Error(err))
+		return
 	}
+
+	// Broadcast alert update to SSE clients
+	broadcastAlert(alert, status, nil)
 }
 
 // SaveAlertWithJobInfo saves an alert to the alertstore with job information
@@ -51,7 +84,11 @@ func SaveAlertWithJobInfo(alertStore alertstore.Store, alert models.Alert, statu
 			zap.String("alertname", alert.Labels["alertname"]),
 			zap.String("status", status),
 			zap.Error(err))
+		return
 	}
+
+	// Broadcast alert update to SSE clients
+	broadcastAlert(alert, status, jobInfo)
 }
 
 // checkExistingJobByGroupKey checks if there's already a running job for the given groupKey
