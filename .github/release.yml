@@ -23,6 +23,9 @@ changelog:
     - title: 🐳 Docker
       labels:
         - docker
+    - title: 🖥️ Frontend
+      labels:
+        - frontend
     - title: Misc
       labels:
         - "*"

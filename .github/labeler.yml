@@ -35,3 +35,9 @@ documentation:
           - "CODE_OF_CONDUCT.md"
           - "LICENSE"
           - "*.md"
+
+frontend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "frontend/**/*"
+          - "frontend/*"

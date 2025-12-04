@@ -30,3 +30,15 @@ updates:
       dependencies:
         patterns:
           - "*"
+
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "frontend"
+    groups:
+      frontend-dependencies:
+        patterns:
+          - "*"
