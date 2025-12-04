@@ -63,6 +63,13 @@ jobs:
           VALIDATE_GO: false # needs to be false if VALIDATE_GO_MODULES is true
           VALIDATE_JSX: false
           VALIDATE_CSS: false
+          VALIDATE_HTML: false
+          VALIDATE_HTML_PRETTIER: false
+          # Disable TypeScript/Vue linting - handled by frontend-tests.yml workflow
+          VALIDATE_TYPESCRIPT_ES: false
+          VALIDATE_TYPESCRIPT_PRETTIER: false
+          VALIDATE_VUE: false
+          VALIDATE_VUE_PRETTIER: false
           TRIVY_CONFIG_FILE: "trivy.yaml"
           # GitLeaks configuration to exclude documentation files
           GITLEAKS_CONFIG_FILE: ".gitleaks.toml"
