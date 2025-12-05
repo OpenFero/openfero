@@ -51,6 +51,34 @@ spec:
             - name: USE_OPERARIUS_CRDS
               value: "{{ .Values.operarius.useOperariusCRDs }}"
             {{- end }}
+            {{- if .Values.auth.enabled }}
+            {{- if eq .Values.auth.method "basic" }}
+            - name: AUTH_BASIC_USER
+              value: {{ .Values.auth.basic.username | quote }}
+            - name: AUTH_BASIC_PASS
+              valueFrom:
+                secretKeyRef:
+                  {{- if .Values.auth.basic.existingSecret }}
+                  name: {{ .Values.auth.basic.existingSecret }}
+                  key: {{ .Values.auth.basic.secretKey | default "password" }}
+                  {{- else }}
+                  name: {{ include "openfero.fullname" . }}-auth
+                  key: password
+                  {{- end }}
+            {{- end }}
+            {{- if eq .Values.auth.method "bearer" }}
+            - name: AUTH_BEARER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  {{- if .Values.auth.bearer.existingSecret }}
+                  name: {{ .Values.auth.bearer.existingSecret }}
+                  key: {{ .Values.auth.bearer.secretKey | default "token" }}
+                  {{- else }}
+                  name: {{ include "openfero.fullname" . }}-auth
+                  key: token
+                  {{- end }}
+            {{- end }}
+            {{- end }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -62,6 +90,16 @@ spec:
             {{- if and .Values.operarius.enabled .Values.operarius.useOperariusCRDs }}
             - "--useOperariusCRDs=true"
             - "--operariusNamespace={{ .Release.Namespace }}"
+            {{- end }}
+            {{- if .Values.auth.enabled }}
+            - "--authMethod={{ .Values.auth.method }}"
+            {{- if eq .Values.auth.method "basic" }}
+            - "--authBasicUser=$(AUTH_BASIC_USER)"
+            - "--authBasicPass=$(AUTH_BASIC_PASS)"
+            {{- end }}
+            {{- if eq .Values.auth.method "bearer" }}
+            - "--authBearerToken=$(AUTH_BEARER_TOKEN)"
+            {{- end }}
             {{- end }}
             {{- with .Values.customArgs }}
             {{- toYaml . | nindent 12 }}
