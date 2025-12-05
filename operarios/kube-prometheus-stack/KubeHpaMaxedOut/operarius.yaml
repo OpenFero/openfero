@@ -1,0 +1,86 @@
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
+metadata:
+  name: hpa-scale-increase
+  namespace: openfero
+spec:
+  alertSelector:
+    alertname: KubeHpaMaxedOut
+    status: firing
+
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 3600
+      template:
+        spec:
+          serviceAccountName: openfero-hpa-scaler
+          restartPolicy: Never
+          containers:
+            - name: hpa-scaler
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  echo "=== KubeHpaMaxedOut Remediation ==="
+                  echo "HPA: ${OPENFERO_HORIZONTALPODAUTOSCALER}"
+                  echo "Namespace: ${OPENFERO_NAMESPACE}"
+                  echo ""
+
+                  # Validate required variables
+                  if [ -z "${OPENFERO_HORIZONTALPODAUTOSCALER}" ] || [ -z "${OPENFERO_NAMESPACE}" ]; then
+                    echo "ERROR: Missing required environment variables"
+                    exit 1
+                  fi
+
+                  # Check if HPA exists
+                  if ! kubectl get hpa "${OPENFERO_HORIZONTALPODAUTOSCALER}" -n "${OPENFERO_NAMESPACE}" > /dev/null 2>&1; then
+                    echo "HPA not found"
+                    exit 1
+                  fi
+
+                  # Get current max replicas
+                  CURRENT_MAX=$(kubectl get hpa "${OPENFERO_HORIZONTALPODAUTOSCALER}" -n "${OPENFERO_NAMESPACE}" -o jsonpath='{.spec.maxReplicas}')
+                  CURRENT_REPLICAS=$(kubectl get hpa "${OPENFERO_HORIZONTALPODAUTOSCALER}" -n "${OPENFERO_NAMESPACE}" -o jsonpath='{.status.currentReplicas}')
+
+                  echo "Current max replicas: ${CURRENT_MAX}"
+                  echo "Current replicas: ${CURRENT_REPLICAS}"
+                  echo ""
+
+                  # Calculate new max (increase by 50%, minimum +2)
+                  INCREASE=$(( CURRENT_MAX / 2 ))
+                  if [ ${INCREASE} -lt 2 ]; then
+                    INCREASE=2
+                  fi
+                  NEW_MAX=$(( CURRENT_MAX + INCREASE ))
+
+                  # Safety cap at 100 replicas (adjust as needed)
+                  MAX_CEILING=100
+                  if [ ${NEW_MAX} -gt ${MAX_CEILING} ]; then
+                    echo "WARNING: New max (${NEW_MAX}) exceeds ceiling (${MAX_CEILING})"
+                    NEW_MAX=${MAX_CEILING}
+                  fi
+
+                  echo "New max replicas: ${NEW_MAX}"
+                  echo ""
+
+                  # Update HPA max replicas
+                  kubectl patch hpa "${OPENFERO_HORIZONTALPODAUTOSCALER}" -n "${OPENFERO_NAMESPACE}" \
+                    --type='json' \
+                    -p="[{\"op\": \"replace\", \"path\": \"/spec/maxReplicas\", \"value\": ${NEW_MAX}}]"
+
+                  echo ""
+                  echo "HPA max replicas increased from ${CURRENT_MAX} to ${NEW_MAX}"
+                  echo ""
+                  echo "NOTE: This is a temporary fix. Review application load and capacity planning."
+                  echo "Consider reverting once the load decreases."
+                  exit 0
+
+  priority: 50
+  enabled: true
+
+  deduplication:
+    enabled: true
+    ttl: 1800

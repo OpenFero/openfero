@@ -1,0 +1,43 @@
+{
+  "version": "4",
+  "groupKey": "{}/{}:{alertname=\"KubeDeploymentReplicasMismatch\"}",
+  "status": "firing",
+  "receiver": "openfero",
+  "groupLabels": {
+    "alertname": "KubeDeploymentReplicasMismatch"
+  },
+  "commonLabels": {
+    "alertname": "KubeDeploymentReplicasMismatch",
+    "severity": "warning",
+    "namespace": "default",
+    "deployment": "test-deployment",
+    "cluster": "test-cluster"
+  },
+  "commonAnnotations": {
+    "description": "Deployment default/test-deployment has not matched the expected number of replicas for longer than 15 minutes.",
+    "summary": "Deployment has not matched the expected number of replicas."
+  },
+  "externalURL": "http://alertmanager:9093",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "KubeDeploymentReplicasMismatch",
+        "severity": "warning",
+        "namespace": "default",
+        "deployment": "test-deployment",
+        "cluster": "test-cluster",
+        "endpoint": "http",
+        "job": "kube-state-metrics"
+      },
+      "annotations": {
+        "description": "Deployment default/test-deployment has not matched the expected number of replicas for longer than 15 minutes.",
+        "summary": "Deployment has not matched the expected number of replicas.",
+        "runbook_url": "https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubedeploymentreplicasmismatch"
+      },
+      "startsAt": "2025-01-01T00:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://prometheus:9090/graph"
+    }
+  ]
+}

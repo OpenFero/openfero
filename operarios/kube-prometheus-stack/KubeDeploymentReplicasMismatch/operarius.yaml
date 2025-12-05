@@ -1,0 +1,80 @@
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
+metadata:
+  name: deployment-replicas-fix
+  namespace: openfero
+spec:
+  alertSelector:
+    alertname: KubeDeploymentReplicasMismatch
+    status: firing
+
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 1800
+      template:
+        spec:
+          serviceAccountName: openfero-deployment-fixer
+          restartPolicy: Never
+          containers:
+            - name: deployment-fixer
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  echo "=== KubeDeploymentReplicasMismatch Remediation ==="
+                  echo "Deployment: ${OPENFERO_DEPLOYMENT}"
+                  echo "Namespace: ${OPENFERO_NAMESPACE}"
+                  echo ""
+
+                  # Validate required variables
+                  if [ -z "${OPENFERO_DEPLOYMENT}" ] || [ -z "${OPENFERO_NAMESPACE}" ]; then
+                    echo "ERROR: Missing required environment variables"
+                    exit 1
+                  fi
+
+                  # Check if deployment exists
+                  if ! kubectl get deployment "${OPENFERO_DEPLOYMENT}" -n "${OPENFERO_NAMESPACE}" > /dev/null 2>&1; then
+                    echo "Deployment not found"
+                    exit 1
+                  fi
+
+                  # Get current replica status
+                  DESIRED=$(kubectl get deployment "${OPENFERO_DEPLOYMENT}" -n "${OPENFERO_NAMESPACE}" -o jsonpath='{.spec.replicas}')
+                  AVAILABLE=$(kubectl get deployment "${OPENFERO_DEPLOYMENT}" -n "${OPENFERO_NAMESPACE}" -o jsonpath='{.status.availableReplicas}')
+                  AVAILABLE=${AVAILABLE:-0}
+
+                  echo "Desired replicas: ${DESIRED}"
+                  echo "Available replicas: ${AVAILABLE}"
+                  echo ""
+
+                  # Get deployment selector for finding pods
+                  SELECTOR=$(kubectl get deployment "${OPENFERO_DEPLOYMENT}" -n "${OPENFERO_NAMESPACE}" -o jsonpath='{.spec.selector.matchLabels}' | tr -d '{}' | sed 's/":"/"=/g; s/","/" -l /g; s/"//g')
+
+                  # Check for stuck pods
+                  echo "Looking for non-running pods..."
+                  kubectl get pods -n "${OPENFERO_NAMESPACE}" -l ${SELECTOR} --field-selector=status.phase!=Running 2>/dev/null || true
+                  echo ""
+
+                  # Trigger rollout restart
+                  echo "Triggering rollout restart..."
+                  kubectl rollout restart deployment/"${OPENFERO_DEPLOYMENT}" -n "${OPENFERO_NAMESPACE}"
+
+                  # Wait for rollout to complete (timeout after 5 minutes)
+                  echo "Waiting for rollout to complete..."
+                  if kubectl rollout status deployment/"${OPENFERO_DEPLOYMENT}" -n "${OPENFERO_NAMESPACE}" --timeout=300s; then
+                    echo "Deployment rollout completed successfully"
+                    exit 0
+                  else
+                    echo "Rollout did not complete within timeout"
+                    exit 1
+                  fi
+
+  priority: 60
+  enabled: true
+
+  deduplication:
+    enabled: true
+    ttl: 600

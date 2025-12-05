@@ -1,0 +1,440 @@
+# OpenFero Operarii Bundle for kube-prometheus-stack
+#
+# This file contains all Operarii and RBAC resources for common
+# kube-prometheus-stack alerts.
+#
+# Install: kubectl apply -f operarii-bundle.yaml
+# Remove:  kubectl delete -f operarii-bundle.yaml
+#
+# For individual Operarii, see the parent directories.
+---
+# =============================================================================
+# RBAC: Service Accounts
+# =============================================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openfero-pod-restarter
+  namespace: openfero
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openfero-deployment-fixer
+  namespace: openfero
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openfero-job-cleaner
+  namespace: openfero
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openfero-hpa-scaler
+  namespace: openfero
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openfero-daemonset-fixer
+  namespace: openfero
+---
+# =============================================================================
+# RBAC: ClusterRoles
+# =============================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: openfero-pod-restarter
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: openfero-deployment-fixer
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/status"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: openfero-job-cleaner
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: openfero-hpa-scaler
+rules:
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: openfero-daemonset-fixer
+rules:
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["get", "list", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["daemonsets/status"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "delete"]
+---
+# =============================================================================
+# RBAC: ClusterRoleBindings
+# =============================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openfero-pod-restarter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: openfero-pod-restarter
+subjects:
+  - kind: ServiceAccount
+    name: openfero-pod-restarter
+    namespace: openfero
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openfero-deployment-fixer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: openfero-deployment-fixer
+subjects:
+  - kind: ServiceAccount
+    name: openfero-deployment-fixer
+    namespace: openfero
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openfero-job-cleaner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: openfero-job-cleaner
+subjects:
+  - kind: ServiceAccount
+    name: openfero-job-cleaner
+    namespace: openfero
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openfero-hpa-scaler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: openfero-hpa-scaler
+subjects:
+  - kind: ServiceAccount
+    name: openfero-hpa-scaler
+    namespace: openfero
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openfero-daemonset-fixer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: openfero-daemonset-fixer
+subjects:
+  - kind: ServiceAccount
+    name: openfero-daemonset-fixer
+    namespace: openfero
+---
+# =============================================================================
+# Operarius: KubePodCrashLooping
+# Priority: 80 (Highest)
+# =============================================================================
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
+metadata:
+  name: pod-crashloop-restart
+  namespace: openfero
+spec:
+  alertSelector:
+    alertname: KubePodCrashLooping
+    status: firing
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 600
+      template:
+        spec:
+          serviceAccountName: openfero-pod-restarter
+          restartPolicy: Never
+          containers:
+            - name: pod-restarter
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  echo "=== KubePodCrashLooping Remediation ==="
+                  echo "Pod: ${OPENFERO_POD}"
+                  echo "Namespace: ${OPENFERO_NAMESPACE}"
+                  echo "Container: ${OPENFERO_CONTAINER}"
+                  echo ""
+                  if [ -z "${OPENFERO_POD}" ] || [ -z "${OPENFERO_NAMESPACE}" ]; then
+                    echo "ERROR: Missing required environment variables"
+                    exit 1
+                  fi
+                  if ! kubectl get pod "${OPENFERO_POD}" -n "${OPENFERO_NAMESPACE}" > /dev/null 2>&1; then
+                    echo "Pod not found - may have already been deleted"
+                    exit 0
+                  fi
+                  echo "Deleting pod to trigger restart..."
+                  kubectl delete pod "${OPENFERO_POD}" -n "${OPENFERO_NAMESPACE}" --wait=false
+                  echo "Pod deletion triggered successfully"
+  priority: 80
+  enabled: true
+  deduplication:
+    enabled: true
+    ttl: 300
+---
+# =============================================================================
+# Operarius: KubeDeploymentReplicasMismatch
+# Priority: 60
+# =============================================================================
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
+metadata:
+  name: deployment-replicas-fix
+  namespace: openfero
+spec:
+  alertSelector:
+    alertname: KubeDeploymentReplicasMismatch
+    status: firing
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 1800
+      template:
+        spec:
+          serviceAccountName: openfero-deployment-fixer
+          restartPolicy: Never
+          containers:
+            - name: deployment-fixer
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  echo "=== KubeDeploymentReplicasMismatch Remediation ==="
+                  echo "Deployment: ${OPENFERO_DEPLOYMENT}"
+                  echo "Namespace: ${OPENFERO_NAMESPACE}"
+                  echo ""
+                  if [ -z "${OPENFERO_DEPLOYMENT}" ] || [ -z "${OPENFERO_NAMESPACE}" ]; then
+                    echo "ERROR: Missing required environment variables"
+                    exit 1
+                  fi
+                  DESIRED=$(kubectl get deployment "${OPENFERO_DEPLOYMENT}" -n "${OPENFERO_NAMESPACE}" -o jsonpath='{.spec.replicas}')
+                  AVAILABLE=$(kubectl get deployment "${OPENFERO_DEPLOYMENT}" -n "${OPENFERO_NAMESPACE}" -o jsonpath='{.status.availableReplicas}')
+                  echo "Desired: ${DESIRED}, Available: ${AVAILABLE:-0}"
+                  echo "Triggering rollout restart..."
+                  kubectl rollout restart deployment/"${OPENFERO_DEPLOYMENT}" -n "${OPENFERO_NAMESPACE}"
+                  kubectl rollout status deployment/"${OPENFERO_DEPLOYMENT}" -n "${OPENFERO_NAMESPACE}" --timeout=300s
+                  echo "Deployment rollout completed"
+  priority: 60
+  enabled: true
+  deduplication:
+    enabled: true
+    ttl: 600
+---
+# =============================================================================
+# Operarius: KubeDaemonSetRolloutStuck
+# Priority: 55
+# =============================================================================
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
+metadata:
+  name: daemonset-rollout-fix
+  namespace: openfero
+spec:
+  alertSelector:
+    alertname: KubeDaemonSetRolloutStuck
+    status: firing
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 1800
+      template:
+        spec:
+          serviceAccountName: openfero-daemonset-fixer
+          restartPolicy: Never
+          containers:
+            - name: daemonset-fixer
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  echo "=== KubeDaemonSetRolloutStuck Remediation ==="
+                  echo "DaemonSet: ${OPENFERO_DAEMONSET}"
+                  echo "Namespace: ${OPENFERO_NAMESPACE}"
+                  echo ""
+                  if [ -z "${OPENFERO_DAEMONSET}" ] || [ -z "${OPENFERO_NAMESPACE}" ]; then
+                    echo "ERROR: Missing required environment variables"
+                    exit 1
+                  fi
+                  kubectl get daemonset "${OPENFERO_DAEMONSET}" -n "${OPENFERO_NAMESPACE}" -o wide
+                  echo "Triggering rollout restart..."
+                  kubectl rollout restart daemonset/"${OPENFERO_DAEMONSET}" -n "${OPENFERO_NAMESPACE}"
+                  kubectl rollout status daemonset/"${OPENFERO_DAEMONSET}" -n "${OPENFERO_NAMESPACE}" --timeout=300s
+                  echo "DaemonSet rollout completed"
+  priority: 55
+  enabled: true
+  deduplication:
+    enabled: true
+    ttl: 600
+---
+# =============================================================================
+# Operarius: KubeHpaMaxedOut
+# Priority: 50
+# NOTE: Review cost implications before enabling in production!
+# =============================================================================
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
+metadata:
+  name: hpa-scale-increase
+  namespace: openfero
+spec:
+  alertSelector:
+    alertname: KubeHpaMaxedOut
+    status: firing
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 3600
+      template:
+        spec:
+          serviceAccountName: openfero-hpa-scaler
+          restartPolicy: Never
+          containers:
+            - name: hpa-scaler
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  echo "=== KubeHpaMaxedOut Remediation ==="
+                  echo "HPA: ${OPENFERO_HORIZONTALPODAUTOSCALER}"
+                  echo "Namespace: ${OPENFERO_NAMESPACE}"
+                  echo ""
+                  if [ -z "${OPENFERO_HORIZONTALPODAUTOSCALER}" ] || [ -z "${OPENFERO_NAMESPACE}" ]; then
+                    echo "ERROR: Missing required environment variables"
+                    exit 1
+                  fi
+                  CURRENT_MAX=$(kubectl get hpa "${OPENFERO_HORIZONTALPODAUTOSCALER}" -n "${OPENFERO_NAMESPACE}" -o jsonpath='{.spec.maxReplicas}')
+                  echo "Current max replicas: ${CURRENT_MAX}"
+                  INCREASE=$(( CURRENT_MAX / 2 ))
+                  [ ${INCREASE} -lt 2 ] && INCREASE=2
+                  NEW_MAX=$(( CURRENT_MAX + INCREASE ))
+                  [ ${NEW_MAX} -gt 100 ] && NEW_MAX=100
+                  echo "New max replicas: ${NEW_MAX}"
+                  kubectl patch hpa "${OPENFERO_HORIZONTALPODAUTOSCALER}" -n "${OPENFERO_NAMESPACE}" \
+                    --type='json' -p="[{\"op\": \"replace\", \"path\": \"/spec/maxReplicas\", \"value\": ${NEW_MAX}}]"
+                  echo "HPA updated successfully"
+  priority: 50
+  enabled: true
+  deduplication:
+    enabled: true
+    ttl: 1800
+---
+# =============================================================================
+# Operarius: KubeJobFailed
+# Priority: 40
+# =============================================================================
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
+metadata:
+  name: failed-job-cleanup
+  namespace: openfero
+spec:
+  alertSelector:
+    alertname: KubeJobFailed
+    status: firing
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      ttlSecondsAfterFinished: 7200
+      template:
+        spec:
+          serviceAccountName: openfero-job-cleaner
+          restartPolicy: Never
+          containers:
+            - name: job-cleaner
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  echo "=== KubeJobFailed Remediation ==="
+                  echo "Job: ${OPENFERO_JOB_NAME}"
+                  echo "Namespace: ${OPENFERO_NAMESPACE}"
+                  echo ""
+                  if [ -z "${OPENFERO_JOB_NAME}" ] || [ -z "${OPENFERO_NAMESPACE}" ]; then
+                    echo "ERROR: Missing required environment variables"
+                    exit 1
+                  fi
+                  if ! kubectl get job "${OPENFERO_JOB_NAME}" -n "${OPENFERO_NAMESPACE}" > /dev/null 2>&1; then
+                    echo "Job not found - may have already been deleted"
+                    exit 0
+                  fi
+                  echo "Job status:"
+                  kubectl get job "${OPENFERO_JOB_NAME}" -n "${OPENFERO_NAMESPACE}" -o wide
+                  echo ""
+                  echo "=== Failed Pod Logs (last 50 lines) ==="
+                  POD=$(kubectl get pods -n "${OPENFERO_NAMESPACE}" -l job-name="${OPENFERO_JOB_NAME}" \
+                    --field-selector=status.phase=Failed -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+                  [ -n "${POD}" ] && kubectl logs "${POD}" -n "${OPENFERO_NAMESPACE}" --tail=50 2>/dev/null || echo "No logs available"
+                  echo ""
+                  echo "Cleaning up failed job..."
+                  kubectl delete job "${OPENFERO_JOB_NAME}" -n "${OPENFERO_NAMESPACE}" --ignore-not-found=true
+                  echo "Job cleaned up successfully"
+  priority: 40
+  enabled: true
+  deduplication:
+    enabled: true
+    ttl: 600

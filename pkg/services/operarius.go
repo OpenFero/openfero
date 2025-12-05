@@ -9,6 +9,7 @@ import (
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
@@ -187,6 +188,24 @@ func (s *OperariusService) CreateJobFromOperarius(ctx context.Context, operarius
 	job.Labels["openfero.io/group-key"] = hookMessage.GroupKey
 	job.Labels["openfero.io/managed-by"] = "openfero"
 	job.Labels["openfero.io/status"] = hookMessage.Status
+
+	// Add alert labels as environment variables (OPENFERO_* prefix)
+	// Use first alert if available, otherwise use common labels
+	var alertLabels map[string]string
+	if len(hookMessage.Alerts) > 0 {
+		alertLabels = hookMessage.Alerts[0].Labels
+	} else {
+		alertLabels = hookMessage.CommonLabels
+	}
+	for i := range job.Spec.Template.Spec.Containers {
+		for labelKey, labelValue := range alertLabels {
+			envName := "OPENFERO_" + strings.ToUpper(strings.ReplaceAll(labelKey, "-", "_"))
+			job.Spec.Template.Spec.Containers[i].Env = append(job.Spec.Template.Spec.Containers[i].Env, corev1.EnvVar{
+				Name:  envName,
+				Value: labelValue,
+			})
+		}
+	}
 
 	// Apply template variables to the job
 	if err := s.applyTemplateVariables(job, hookMessage); err != nil {

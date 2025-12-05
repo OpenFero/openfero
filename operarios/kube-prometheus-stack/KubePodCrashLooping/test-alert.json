@@ -1,0 +1,46 @@
+{
+  "version": "4",
+  "groupKey": "{}/{}:{alertname=\"KubePodCrashLooping\"}",
+  "status": "firing",
+  "receiver": "openfero",
+  "groupLabels": {
+    "alertname": "KubePodCrashLooping"
+  },
+  "commonLabels": {
+    "alertname": "KubePodCrashLooping",
+    "severity": "warning",
+    "namespace": "default",
+    "pod": "test-crashloop-pod",
+    "container": "main",
+    "cluster": "test-cluster"
+  },
+  "commonAnnotations": {
+    "description": "Pod default/test-crashloop-pod (main) is in waiting state (reason: \"CrashLoopBackOff\").",
+    "summary": "Pod is crash looping."
+  },
+  "externalURL": "http://alertmanager:9093",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "KubePodCrashLooping",
+        "severity": "warning",
+        "namespace": "default",
+        "pod": "test-crashloop-pod",
+        "container": "main",
+        "cluster": "test-cluster",
+        "endpoint": "http",
+        "job": "kube-state-metrics",
+        "reason": "CrashLoopBackOff"
+      },
+      "annotations": {
+        "description": "Pod default/test-crashloop-pod (main) is in waiting state (reason: \"CrashLoopBackOff\").",
+        "summary": "Pod is crash looping.",
+        "runbook_url": "https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubepodcrashlooping"
+      },
+      "startsAt": "2025-01-01T00:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://prometheus:9090/graph?g0.expr=max_over_time%28kube_pod_container_status_waiting_reason%7Breason%3D%22CrashLoopBackOff%22%7D%5B5m%5D%29+%3E%3D+1"
+    }
+  ]
+}

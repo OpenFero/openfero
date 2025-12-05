@@ -658,3 +658,503 @@ spec:
 		})
 	})
 })
+
+// Operarius Starter Pack Real-Resource Integration Tests
+// These tests verify that production-ready Operarii actually remediate real Kubernetes resources
+var _ = Describe("Operarius Starter Pack Real-Resource Remediation", Ordered, Label("starter-pack"), func() {
+	var localPort string
+
+	BeforeAll(func() {
+		By("verifying OpenFero is running")
+		Eventually(func() error {
+			cmd := exec.Command("kubectl", "get", "pods", "-n", namespace,
+				"-l", "app.kubernetes.io/name=openfero",
+				"-o", "jsonpath={.items[0].status.phase}")
+			output, err := utils.Run(cmd)
+			if err != nil {
+				return err
+			}
+			if strings.TrimSpace(output) != "Running" {
+				return fmt.Errorf("OpenFero pod not running, status: %s", output)
+			}
+			return nil
+		}, 60*time.Second, 2*time.Second).Should(Succeed())
+
+		By("setting up port-forward to OpenFero")
+		localPort = "9191"
+
+		// Check if port-forward is already running from previous test suite
+		cmd := exec.Command("curl", "-s", "--connect-timeout", "2",
+			fmt.Sprintf("http://localhost:%s/healthz", localPort))
+		_, err := utils.Run(cmd)
+		if err != nil {
+			// Start port-forward if not running
+			pfCmd := exec.Command("kubectl", "port-forward", "-n", namespace,
+				"svc/openfero", fmt.Sprintf("%s:8080", localPort))
+			pfCmd.Stdout = GinkgoWriter
+			pfCmd.Stderr = GinkgoWriter
+			err = pfCmd.Start()
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(func() {
+				if pfCmd.Process != nil {
+					_ = pfCmd.Process.Kill()
+				}
+			})
+
+			// Wait for port-forward to be ready
+			Eventually(func() error {
+				cmd := exec.Command("curl", "-s", "--connect-timeout", "2",
+					fmt.Sprintf("http://localhost:%s/healthz", localPort))
+				_, err := utils.Run(cmd)
+				return err
+			}, 30*time.Second, 1*time.Second).Should(Succeed())
+		}
+	})
+
+	Context("KubePodCrashLooping Remediation", func() {
+		const testNs = "e2e-crashloop-test"
+
+		BeforeEach(func() {
+			By("creating test namespace")
+			cmd := exec.Command("kubectl", "create", "namespace", testNs, "--dry-run=client", "-o", "yaml")
+			output, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+			err = utils.ApplyYAML(output)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			By("cleaning up test namespace")
+			cmd := exec.Command("kubectl", "delete", "namespace", testNs, "--ignore-not-found", "--wait=false")
+			_, _ = utils.Run(cmd)
+		})
+
+		It("should delete a crash-looping pod when KubePodCrashLooping alert is received", func() {
+			// Create Operarius for KubePodCrashLooping
+			operariusYAML := fmt.Sprintf(`
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
+metadata:
+  name: e2e-kubepodcrashlooping
+  namespace: %s
+spec:
+  alertSelector:
+    alertname: KubePodCrashLooping
+    status: firing
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      ttlSecondsAfterFinished: 120
+      template:
+        spec:
+          serviceAccountName: openfero-crashloop-remediator
+          containers:
+          - name: remediate
+            image: bitnami/kubectl:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Remediating crash-looping pod..."
+              echo "Namespace: $OPENFERO_NAMESPACE"
+              echo "Pod: $OPENFERO_POD"
+              kubectl delete pod "$OPENFERO_POD" -n "$OPENFERO_NAMESPACE" --ignore-not-found
+              echo "Pod deletion initiated"
+          restartPolicy: Never
+  enabled: true
+  priority: 80
+`, namespace)
+
+			// Create RBAC for the remediation job
+			rbacYAML := fmt.Sprintf(`
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openfero-crashloop-remediator
+  namespace: %s
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: e2e-crashloop-remediator
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: e2e-crashloop-remediator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: e2e-crashloop-remediator
+subjects:
+- kind: ServiceAccount
+  name: openfero-crashloop-remediator
+  namespace: %s
+`, namespace, namespace)
+
+			By("creating RBAC for remediation")
+			err := utils.ApplyYAML(rbacYAML)
+			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				_ = utils.DeleteYAML(rbacYAML)
+			}()
+
+			By("creating KubePodCrashLooping Operarius")
+			err = utils.ApplyYAML(operariusYAML)
+			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				_ = utils.DeleteYAML(operariusYAML)
+			}()
+
+			// Wait for Operarius to be ready
+			time.Sleep(2 * time.Second)
+
+			// Create a test pod in the test namespace
+			testPodYAML := fmt.Sprintf(`
+apiVersion: v1
+kind: Pod
+metadata:
+  name: crashloop-victim
+  namespace: %s
+  labels:
+    app: crashloop-test
+spec:
+  containers:
+  - name: sleeper
+    image: busybox:latest
+    command: ["sleep", "3600"]
+  restartPolicy: Always
+`, testNs)
+
+			By("creating test pod to be remediated")
+			err = utils.ApplyYAML(testPodYAML)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Wait for pod to be running
+			Eventually(func() bool {
+				cmd := exec.Command("kubectl", "get", "pod", "crashloop-victim", "-n", testNs,
+					"-o", "jsonpath={.status.phase}")
+				output, err := utils.Run(cmd)
+				if err != nil {
+					return false
+				}
+				return strings.TrimSpace(output) == "Running"
+			}, 60*time.Second, 2*time.Second).Should(BeTrue(), "Test pod should be running")
+
+			// Get the pod UID for verification
+			cmd := exec.Command("kubectl", "get", "pod", "crashloop-victim", "-n", testNs,
+				"-o", "jsonpath={.metadata.uid}")
+			originalUID, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Fprintf(GinkgoWriter, "Original pod UID: %s\n", originalUID)
+
+			// Send KubePodCrashLooping alert
+			alertJSON := fmt.Sprintf(`{
+				"version": "4",
+				"groupKey": "e2e-crashloop-%d",
+				"status": "firing",
+				"receiver": "openfero",
+				"groupLabels": {
+					"alertname": "KubePodCrashLooping"
+				},
+				"commonLabels": {
+					"alertname": "KubePodCrashLooping",
+					"namespace": "%s",
+					"pod": "crashloop-victim"
+				},
+				"alerts": [{
+					"status": "firing",
+					"labels": {
+						"alertname": "KubePodCrashLooping",
+						"namespace": "%s",
+						"pod": "crashloop-victim",
+						"container": "sleeper",
+						"severity": "warning"
+					},
+					"annotations": {
+						"summary": "Pod is crash looping"
+					}
+				}]
+			}`, time.Now().UnixNano(), testNs, testNs)
+
+			By("sending KubePodCrashLooping alert to OpenFero")
+			cmd = exec.Command("curl", "-s", "-X", "POST",
+				fmt.Sprintf("http://localhost:%s/alerts", localPort),
+				"-H", "Content-Type: application/json",
+				"-d", alertJSON,
+				"-w", "\n%{http_code}",
+			)
+			output, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Fprintf(GinkgoWriter, "Alert webhook response: %s\n", output)
+			Expect(output).To(ContainSubstring("200"))
+
+			By("verifying remediation job was created")
+			Eventually(func() bool {
+				cmd := exec.Command("kubectl", "get", "jobs", "-n", namespace,
+					"-l", "openfero.io/group-key",
+					"-o", "jsonpath={.items[*].metadata.name}")
+				output, err := utils.Run(cmd)
+				if err != nil {
+					return false
+				}
+				return len(strings.TrimSpace(output)) > 0
+			}, 30*time.Second, 2*time.Second).Should(BeTrue(), "Remediation job should be created")
+
+			By("waiting for remediation job to complete")
+			Eventually(func() bool {
+				cmd := exec.Command("kubectl", "get", "jobs", "-n", namespace,
+					"-l", "openfero.io/group-key",
+					"-o", "jsonpath={.items[?(@.status.succeeded==1)].metadata.name}")
+				output, err := utils.Run(cmd)
+				if err != nil {
+					return false
+				}
+				return len(strings.TrimSpace(output)) > 0
+			}, 120*time.Second, 2*time.Second).Should(BeTrue(), "Remediation job should succeed")
+
+			By("verifying the original pod was deleted")
+			// Since the pod has restartPolicy: Always, it will be recreated with a new UID
+			// But for standalone pod (not managed by deployment), it won't be recreated
+			Eventually(func() bool {
+				// Check if pod still exists (might be deleted or recreated)
+				cmd := exec.Command("kubectl", "get", "pod", "crashloop-victim", "-n", testNs,
+					"-o", "jsonpath={.metadata.uid}", "--ignore-not-found")
+				newUID, err := utils.Run(cmd)
+				if err != nil {
+					fmt.Fprintf(GinkgoWriter, "Error getting pod: %v\n", err)
+					return false
+				}
+				// Pod was either deleted (empty UID) or recreated (different UID)
+				// For a standalone pod, it won't be recreated, so we check if it's gone
+				fmt.Fprintf(GinkgoWriter, "Current pod UID: %s (original: %s)\n", newUID, originalUID)
+				return newUID == "" || newUID != strings.TrimSpace(string(originalUID))
+			}, 30*time.Second, 2*time.Second).Should(BeTrue(),
+				"Original pod should be deleted (standalone pod won't be recreated)")
+		})
+	})
+
+	Context("KubeJobFailed Remediation", func() {
+		const testNs = "e2e-jobfailed-test"
+
+		BeforeEach(func() {
+			By("creating test namespace")
+			cmd := exec.Command("kubectl", "create", "namespace", testNs, "--dry-run=client", "-o", "yaml")
+			output, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+			err = utils.ApplyYAML(output)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			By("cleaning up test namespace")
+			cmd := exec.Command("kubectl", "delete", "namespace", testNs, "--ignore-not-found", "--wait=false")
+			_, _ = utils.Run(cmd)
+		})
+
+		It("should delete a failed job when KubeJobFailed alert is received", func() {
+			// Create Operarius for KubeJobFailed
+			operariusYAML := fmt.Sprintf(`
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
+metadata:
+  name: e2e-kubejobfailed
+  namespace: %s
+spec:
+  alertSelector:
+    alertname: KubeJobFailed
+    status: firing
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      ttlSecondsAfterFinished: 120
+      template:
+        spec:
+          serviceAccountName: openfero-job-remediator
+          containers:
+          - name: remediate
+            image: bitnami/kubectl:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Cleaning up failed job..."
+              echo "Namespace: $OPENFERO_NAMESPACE"
+              echo "Job: $OPENFERO_JOB_NAME"
+              # Delete the failed job
+              kubectl delete job "$OPENFERO_JOB_NAME" -n "$OPENFERO_NAMESPACE" --ignore-not-found
+              echo "Failed job deleted"
+          restartPolicy: Never
+  enabled: true
+  priority: 40
+`, namespace)
+
+			// Create RBAC for the remediation job
+			rbacYAML := fmt.Sprintf(`
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openfero-job-remediator
+  namespace: %s
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: e2e-job-remediator
+rules:
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: e2e-job-remediator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: e2e-job-remediator
+subjects:
+- kind: ServiceAccount
+  name: openfero-job-remediator
+  namespace: %s
+`, namespace, namespace)
+
+			By("creating RBAC for remediation")
+			err := utils.ApplyYAML(rbacYAML)
+			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				_ = utils.DeleteYAML(rbacYAML)
+			}()
+
+			By("creating KubeJobFailed Operarius")
+			err = utils.ApplyYAML(operariusYAML)
+			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				_ = utils.DeleteYAML(operariusYAML)
+			}()
+
+			// Wait for Operarius to be ready
+			time.Sleep(2 * time.Second)
+
+			// Create a failing job in the test namespace
+			failingJobYAML := fmt.Sprintf(`
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: failed-job-victim
+  namespace: %s
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      containers:
+      - name: fail
+        image: busybox:latest
+        command: ["sh", "-c", "exit 1"]
+      restartPolicy: Never
+`, testNs)
+
+			By("creating a job that will fail")
+			err = utils.ApplyYAML(failingJobYAML)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Wait for job to fail
+			Eventually(func() bool {
+				cmd := exec.Command("kubectl", "get", "job", "failed-job-victim", "-n", testNs,
+					"-o", "jsonpath={.status.failed}")
+				output, err := utils.Run(cmd)
+				if err != nil {
+					return false
+				}
+				return strings.TrimSpace(output) == "1"
+			}, 60*time.Second, 2*time.Second).Should(BeTrue(), "Test job should fail")
+
+			// Verify the failed job exists
+			cmd := exec.Command("kubectl", "get", "job", "failed-job-victim", "-n", testNs)
+			_, err = utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "Failed job should exist before remediation")
+
+			// Send KubeJobFailed alert
+			alertJSON := fmt.Sprintf(`{
+				"version": "4",
+				"groupKey": "e2e-jobfailed-%d",
+				"status": "firing",
+				"receiver": "openfero",
+				"groupLabels": {
+					"alertname": "KubeJobFailed"
+				},
+				"commonLabels": {
+					"alertname": "KubeJobFailed",
+					"namespace": "%s",
+					"job_name": "failed-job-victim"
+				},
+				"alerts": [{
+					"status": "firing",
+					"labels": {
+						"alertname": "KubeJobFailed",
+						"namespace": "%s",
+						"job_name": "failed-job-victim",
+						"severity": "warning"
+					},
+					"annotations": {
+						"summary": "Job has failed"
+					}
+				}]
+			}`, time.Now().UnixNano(), testNs, testNs)
+
+			By("sending KubeJobFailed alert to OpenFero")
+			cmd = exec.Command("curl", "-s", "-X", "POST",
+				fmt.Sprintf("http://localhost:%s/alerts", localPort),
+				"-H", "Content-Type: application/json",
+				"-d", alertJSON,
+				"-w", "\n%{http_code}",
+			)
+			output, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Fprintf(GinkgoWriter, "Alert webhook response: %s\n", output)
+			Expect(output).To(ContainSubstring("200"))
+
+			By("verifying remediation job was created")
+			Eventually(func() bool {
+				cmd := exec.Command("kubectl", "get", "jobs", "-n", namespace,
+					"-l", "openfero.io/group-key",
+					"-o", "jsonpath={.items[*].metadata.name}")
+				output, err := utils.Run(cmd)
+				if err != nil {
+					return false
+				}
+				return len(strings.TrimSpace(output)) > 0
+			}, 30*time.Second, 2*time.Second).Should(BeTrue(), "Remediation job should be created")
+
+			By("verifying the failed job was deleted")
+			Eventually(func() bool {
+				cmd := exec.Command("kubectl", "get", "job", "failed-job-victim", "-n", testNs,
+					"--ignore-not-found", "-o", "jsonpath={.metadata.name}")
+				output, err := utils.Run(cmd)
+				if err != nil {
+					return false
+				}
+				// Job should be deleted (empty output)
+				return strings.TrimSpace(output) == ""
+			}, 90*time.Second, 2*time.Second).Should(BeTrue(),
+				"Failed job should be deleted by remediation")
+
+			By("verifying remediation job completed successfully")
+			Eventually(func() bool {
+				cmd := exec.Command("kubectl", "get", "jobs", "-n", namespace,
+					"-l", "openfero.io/group-key",
+					"-o", "jsonpath={.items[?(@.status.succeeded==1)].metadata.name}")
+				output, err := utils.Run(cmd)
+				if err != nil {
+					return false
+				}
+				return len(strings.TrimSpace(output)) > 0
+			}, 120*time.Second, 2*time.Second).Should(BeTrue(), "Remediation job should succeed")
+		})
+	})
+})

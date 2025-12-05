@@ -1,0 +1,43 @@
+{
+  "version": "4",
+  "groupKey": "{}/{}:{alertname=\"KubeDaemonSetRolloutStuck\"}",
+  "status": "firing",
+  "receiver": "openfero",
+  "groupLabels": {
+    "alertname": "KubeDaemonSetRolloutStuck"
+  },
+  "commonLabels": {
+    "alertname": "KubeDaemonSetRolloutStuck",
+    "severity": "warning",
+    "namespace": "kube-system",
+    "daemonset": "test-daemonset",
+    "cluster": "test-cluster"
+  },
+  "commonAnnotations": {
+    "description": "DaemonSet kube-system/test-daemonset has not finished or progressed for at least 15m.",
+    "summary": "DaemonSet rollout is stuck."
+  },
+  "externalURL": "http://alertmanager:9093",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "KubeDaemonSetRolloutStuck",
+        "severity": "warning",
+        "namespace": "kube-system",
+        "daemonset": "test-daemonset",
+        "cluster": "test-cluster",
+        "endpoint": "http",
+        "job": "kube-state-metrics"
+      },
+      "annotations": {
+        "description": "DaemonSet kube-system/test-daemonset has not finished or progressed for at least 15m.",
+        "summary": "DaemonSet rollout is stuck.",
+        "runbook_url": "https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubedaemonsetrolloutstuck"
+      },
+      "startsAt": "2025-01-01T00:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://prometheus:9090/graph"
+    }
+  ]
+}

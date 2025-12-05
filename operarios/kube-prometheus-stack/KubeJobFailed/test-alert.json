@@ -1,0 +1,43 @@
+{
+  "version": "4",
+  "groupKey": "{}/{}:{alertname=\"KubeJobFailed\"}",
+  "status": "firing",
+  "receiver": "openfero",
+  "groupLabels": {
+    "alertname": "KubeJobFailed"
+  },
+  "commonLabels": {
+    "alertname": "KubeJobFailed",
+    "severity": "warning",
+    "namespace": "default",
+    "job_name": "test-failed-job",
+    "cluster": "test-cluster"
+  },
+  "commonAnnotations": {
+    "description": "Job default/test-failed-job failed to complete. Removing failed job after investigation should clear this alert.",
+    "summary": "Job failed to complete."
+  },
+  "externalURL": "http://alertmanager:9093",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "KubeJobFailed",
+        "severity": "warning",
+        "namespace": "default",
+        "job_name": "test-failed-job",
+        "cluster": "test-cluster",
+        "endpoint": "http",
+        "job": "kube-state-metrics"
+      },
+      "annotations": {
+        "description": "Job default/test-failed-job failed to complete. Removing failed job after investigation should clear this alert.",
+        "summary": "Job failed to complete.",
+        "runbook_url": "https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubejobfailed"
+      },
+      "startsAt": "2025-01-01T00:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://prometheus:9090/graph"
+    }
+  ]
+}
