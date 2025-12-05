@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	operariusv1alpha1 "github.com/OpenFero/openfero/api/v1alpha1"
@@ -22,6 +23,7 @@ type OperariusClient struct {
 	client    ctrlclient.Client
 	namespace string
 	store     cache.Store
+	storeMu   sync.RWMutex
 	informer  cache.SharedIndexInformer
 	scheme    *runtime.Scheme
 }
@@ -74,9 +76,14 @@ func getRestConfig(kubeconfig *string) (*rest.Config, error) {
 
 // InitOperariusInformer initializes the Operarius informer and returns the store
 func (c *OperariusClient) InitOperariusInformer(ctx context.Context, restConfig *rest.Config) (cache.Store, error) {
-	// Create a typed REST client for list/watch operations
-	restConfig.ContentConfig.GroupVersion = &operariusv1alpha1.GroupVersion
-	restConfig.APIPath = "/apis"
+	// Get REST config if not provided
+	if restConfig == nil {
+		var err error
+		restConfig, err = getRestConfig(nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get REST config: %w", err)
+		}
+	}
 
 	// Create list/watch functions using controller-runtime client
 	listFunc := func(options metav1.ListOptions) (runtime.Object, error) {
@@ -91,27 +98,27 @@ func (c *OperariusClient) InitOperariusInformer(ctx context.Context, restConfig 
 	}
 
 	watchFunc := func(options metav1.ListOptions) (watch.Interface, error) {
-		// For watch, we need to use a raw REST client
-		// controller-runtime doesn't directly support watch.Interface
-		// We'll use a polling approach through the informer's resync
+		// Watch not implemented - using resync for cache updates
+		// Note: The GetOperariiForNamespace function reads directly from API
+		// to ensure newly created Operarii are immediately available
 		return nil, fmt.Errorf("watch not implemented - using resync")
 	}
 
-	// Create informer with just list (watch will use resync)
+	// Create informer with list (watch uses resync)
 	c.informer = cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc:  listFunc,
 			WatchFunc: watchFunc,
 		},
 		&operariusv1alpha1.Operarius{},
-		time.Minute*1, // Shorter resync period since we don't have watch
+		time.Minute*1, // Resync period for cache updates
 		cache.Indexers{
 			cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
 		},
 	)
 
 	// Add event handlers
-	_, err := c.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, handlerErr := c.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			operarius, ok := obj.(*operariusv1alpha1.Operarius)
 			if ok {
@@ -138,8 +145,8 @@ func (c *OperariusClient) InitOperariusInformer(ctx context.Context, restConfig 
 			}
 		},
 	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to add event handler: %w", err)
+	if handlerErr != nil {
+		return nil, fmt.Errorf("failed to add event handler: %w", handlerErr)
 	}
 
 	// Start informer in background

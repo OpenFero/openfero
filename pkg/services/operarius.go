@@ -22,8 +22,8 @@ import (
 
 // OperariusService handles Operarius CRD-based job creation
 type OperariusService struct {
-	kubeClient       kubernetes.Interface
-	operariusClient  *k8sclient.OperariusClient
+	kubeClient      kubernetes.Interface
+	operariusClient *k8sclient.OperariusClient
 }
 
 // NewOperariusService creates a new OperariusService
@@ -320,13 +320,15 @@ func (s *OperariusService) GetOperariiForNamespace(ctx context.Context, namespac
 		return []operariusv1alpha1.Operarius{}, nil
 	}
 
-	// Try to get from cache first
-	operarii, err := s.operariusClient.List()
+	// Always read from API to get the latest Operarii
+	// This ensures newly created Operarii are immediately available
+	// The cache is still used for informer event handlers
+	operarii, err := s.operariusClient.ListFromAPI(ctx)
 	if err != nil {
-		log.Warn("Failed to list Operarii from cache, trying API",
+		// Fallback to cache if API call fails (e.g., network issues)
+		log.Warn("Failed to list Operarii from API, trying cache",
 			zap.Error(err))
-		// Fallback to direct API call
-		operarii, err = s.operariusClient.ListFromAPI(ctx)
+		operarii, err = s.operariusClient.List()
 		if err != nil {
 			return nil, fmt.Errorf("failed to list Operarii: %w", err)
 		}
