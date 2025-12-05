@@ -20,10 +20,19 @@ import (
 	"go.uber.org/zap"
 )
 
+// OperariusClientInterface defines the interface for Operarius client operations
+// This allows for mocking in tests
+type OperariusClientInterface interface {
+	List() ([]operariusv1alpha1.Operarius, error)
+	ListFromAPI(ctx context.Context) ([]operariusv1alpha1.Operarius, error)
+	UpdateStatus(ctx context.Context, operarius *operariusv1alpha1.Operarius) error
+	GetNamespace() string
+}
+
 // OperariusService handles Operarius CRD-based job creation
 type OperariusService struct {
 	kubeClient      kubernetes.Interface
-	operariusClient *k8sclient.OperariusClient
+	operariusClient OperariusClientInterface
 }
 
 // NewOperariusService creates a new OperariusService
@@ -34,7 +43,16 @@ func NewOperariusService(kubeClient kubernetes.Interface) *OperariusService {
 }
 
 // NewOperariusServiceWithClient creates a new OperariusService with an Operarius client
-func NewOperariusServiceWithClient(kubeClient kubernetes.Interface, operariusClient *k8sclient.OperariusClient) *OperariusService {
+func NewOperariusServiceWithClient(kubeClient kubernetes.Interface, operariusClient OperariusClientInterface) *OperariusService {
+	return &OperariusService{
+		kubeClient:      kubeClient,
+		operariusClient: operariusClient,
+	}
+}
+
+// NewOperariusServiceWithK8sClient creates a new OperariusService with a concrete k8s Operarius client
+// This is a convenience function for production use
+func NewOperariusServiceWithK8sClient(kubeClient kubernetes.Interface, operariusClient *k8sclient.OperariusClient) *OperariusService {
 	return &OperariusService{
 		kubeClient:      kubeClient,
 		operariusClient: operariusClient,

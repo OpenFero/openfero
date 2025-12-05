@@ -236,7 +236,7 @@ func main() {
 		}
 
 		// Create OperariusService and wire it up
-		operariusService := services.NewOperariusServiceWithClient(&kubeClient.Clientset, operariusClient)
+		operariusService := services.NewOperariusServiceWithK8sClient(&kubeClient.Clientset, operariusClient)
 		server.OperariusService = operariusService
 		server.UseOperariusCRDs = true
 
