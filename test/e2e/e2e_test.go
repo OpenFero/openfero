@@ -750,7 +750,7 @@ spec:
           serviceAccountName: openfero-crashloop-remediator
           containers:
           - name: remediate
-            image: bitnami/kubectl:1.31
+            image: bitnami/kubectl:latest
             command:
             - /bin/sh
             - -c
@@ -905,8 +905,21 @@ spec:
 				return len(strings.TrimSpace(output)) > 0
 			}, 30*time.Second, 2*time.Second).Should(BeTrue(), "Remediation job should be created")
 
-			By("verifying the original pod was deleted and recreated")
+			By("waiting for remediation job to complete")
+			Eventually(func() bool {
+				cmd := exec.Command("kubectl", "get", "jobs", "-n", namespace,
+					"-l", "openfero.io/group-key",
+					"-o", "jsonpath={.items[?(@.status.succeeded==1)].metadata.name}")
+				output, err := utils.Run(cmd)
+				if err != nil {
+					return false
+				}
+				return len(strings.TrimSpace(output)) > 0
+			}, 120*time.Second, 2*time.Second).Should(BeTrue(), "Remediation job should succeed")
+
+			By("verifying the original pod was deleted")
 			// Since the pod has restartPolicy: Always, it will be recreated with a new UID
+			// But for standalone pod (not managed by deployment), it won't be recreated
 			Eventually(func() bool {
 				// Check if pod still exists (might be deleted or recreated)
 				cmd := exec.Command("kubectl", "get", "pod", "crashloop-victim", "-n", testNs,
@@ -920,20 +933,8 @@ spec:
 				// For a standalone pod, it won't be recreated, so we check if it's gone
 				fmt.Fprintf(GinkgoWriter, "Current pod UID: %s (original: %s)\n", newUID, originalUID)
 				return newUID == "" || newUID != strings.TrimSpace(string(originalUID))
-			}, 60*time.Second, 2*time.Second).Should(BeTrue(),
+			}, 30*time.Second, 2*time.Second).Should(BeTrue(),
 				"Original pod should be deleted (standalone pod won't be recreated)")
-
-			By("verifying remediation job completed successfully")
-			Eventually(func() bool {
-				cmd := exec.Command("kubectl", "get", "jobs", "-n", namespace,
-					"-l", "openfero.io/group-key",
-					"-o", "jsonpath={.items[?(@.status.succeeded==1)].metadata.name}")
-				output, err := utils.Run(cmd)
-				if err != nil {
-					return false
-				}
-				return len(strings.TrimSpace(output)) > 0
-			}, 120*time.Second, 2*time.Second).Should(BeTrue(), "Remediation job should succeed")
 		})
 	})
 
@@ -976,7 +977,7 @@ spec:
           serviceAccountName: openfero-job-remediator
           containers:
           - name: remediate
-            image: bitnami/kubectl:1.31
+            image: bitnami/kubectl:latest
             command:
             - /bin/sh
             - -c

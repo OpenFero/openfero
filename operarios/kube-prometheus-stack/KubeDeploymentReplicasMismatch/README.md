@@ -35,12 +35,12 @@ When triggered, this Operarius:
 
 OpenFero automatically provides these from the alert labels:
 
-| Variable | Description |
-|----------|-------------|
-| `OPENFERO_NAMESPACE` | Namespace of the deployment |
-| `OPENFERO_DEPLOYMENT` | Name of the deployment |
-| `OPENFERO_SEVERITY` | Alert severity (warning) |
-| `OPENFERO_CLUSTER` | Cluster name |
+| Variable              | Description                 |
+| --------------------- | --------------------------- |
+| `OPENFERO_NAMESPACE`  | Namespace of the deployment |
+| `OPENFERO_DEPLOYMENT` | Name of the deployment      |
+| `OPENFERO_SEVERITY`   | Alert severity (warning)    |
+| `OPENFERO_CLUSTER`    | Cluster name                |
 
 ## Installation
 

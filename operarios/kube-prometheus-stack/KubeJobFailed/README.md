@@ -32,12 +32,12 @@ This is useful for cleaning up jobs that have failed and are no longer needed, p
 
 OpenFero automatically provides these from the alert labels:
 
-| Variable | Description |
-|----------|-------------|
+| Variable             | Description                 |
+| -------------------- | --------------------------- |
 | `OPENFERO_NAMESPACE` | Namespace of the failed job |
-| `OPENFERO_JOB_NAME` | Name of the failed job |
-| `OPENFERO_SEVERITY` | Alert severity (warning) |
-| `OPENFERO_CLUSTER` | Cluster name |
+| `OPENFERO_JOB_NAME`  | Name of the failed job      |
+| `OPENFERO_SEVERITY`  | Alert severity (warning)    |
+| `OPENFERO_CLUSTER`   | Cluster name                |
 
 ## Installation
 

@@ -201,7 +201,7 @@ spec:
           restartPolicy: Never
           containers:
             - name: pod-restarter
-              image: bitnami/kubectl:1.31
+              image: bitnami/kubectl:latest
               command:
                 - /bin/sh
                 - -c
@@ -252,7 +252,7 @@ spec:
           restartPolicy: Never
           containers:
             - name: deployment-fixer
-              image: bitnami/kubectl:1.31
+              image: bitnami/kubectl:latest
               command:
                 - /bin/sh
                 - -c
@@ -302,7 +302,7 @@ spec:
           restartPolicy: Never
           containers:
             - name: daemonset-fixer
-              image: bitnami/kubectl:1.31
+              image: bitnami/kubectl:latest
               command:
                 - /bin/sh
                 - -c
@@ -351,7 +351,7 @@ spec:
           restartPolicy: Never
           containers:
             - name: hpa-scaler
-              image: bitnami/kubectl:1.31
+              image: bitnami/kubectl:latest
               command:
                 - /bin/sh
                 - -c
@@ -404,7 +404,7 @@ spec:
           restartPolicy: Never
           containers:
             - name: job-cleaner
-              image: bitnami/kubectl:1.31
+              image: bitnami/kubectl:latest
               command:
                 - /bin/sh
                 - -c

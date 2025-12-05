@@ -31,13 +31,13 @@ This is useful when a pod is stuck in CrashLoopBackOff due to transient issues t
 
 OpenFero automatically provides these from the alert labels:
 
-| Variable | Description |
-|----------|-------------|
-| `OPENFERO_NAMESPACE` | Namespace of the crashing pod |
-| `OPENFERO_POD` | Name of the crashing pod |
+| Variable             | Description                     |
+| -------------------- | ------------------------------- |
+| `OPENFERO_NAMESPACE` | Namespace of the crashing pod   |
+| `OPENFERO_POD`       | Name of the crashing pod        |
 | `OPENFERO_CONTAINER` | Container that is crash looping |
-| `OPENFERO_SEVERITY` | Alert severity (warning) |
-| `OPENFERO_CLUSTER` | Cluster name |
+| `OPENFERO_SEVERITY`  | Alert severity (warning)        |
+| `OPENFERO_CLUSTER`   | Cluster name                    |
 
 ## Installation
 

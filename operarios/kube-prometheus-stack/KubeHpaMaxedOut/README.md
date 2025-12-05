@@ -33,12 +33,12 @@ When triggered, this Operarius:
 
 OpenFero automatically provides these from the alert labels:
 
-| Variable | Description |
-|----------|-------------|
-| `OPENFERO_NAMESPACE` | Namespace of the HPA |
-| `OPENFERO_HORIZONTALPODAUTOSCALER` | Name of the HPA |
-| `OPENFERO_SEVERITY` | Alert severity (warning) |
-| `OPENFERO_CLUSTER` | Cluster name |
+| Variable                           | Description              |
+| ---------------------------------- | ------------------------ |
+| `OPENFERO_NAMESPACE`               | Namespace of the HPA     |
+| `OPENFERO_HORIZONTALPODAUTOSCALER` | Name of the HPA          |
+| `OPENFERO_SEVERITY`                | Alert severity (warning) |
+| `OPENFERO_CLUSTER`                 | Cluster name             |
 
 ## Installation
 

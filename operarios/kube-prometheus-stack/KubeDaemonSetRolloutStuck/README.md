@@ -40,12 +40,12 @@ When triggered, this Operarius:
 
 OpenFero automatically provides these from the alert labels:
 
-| Variable | Description |
-|----------|-------------|
+| Variable             | Description                |
+| -------------------- | -------------------------- |
 | `OPENFERO_NAMESPACE` | Namespace of the DaemonSet |
-| `OPENFERO_DAEMONSET` | Name of the DaemonSet |
-| `OPENFERO_SEVERITY` | Alert severity (warning) |
-| `OPENFERO_CLUSTER` | Cluster name |
+| `OPENFERO_DAEMONSET` | Name of the DaemonSet      |
+| `OPENFERO_SEVERITY`  | Alert severity (warning)   |
+| `OPENFERO_CLUSTER`   | Cluster name               |
 
 ## Installation
 

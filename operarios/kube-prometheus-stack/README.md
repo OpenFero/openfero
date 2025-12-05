@@ -18,13 +18,13 @@ Production-ready Operarius CRDs for common [kube-prometheus-stack](https://githu
 
 ## Available Operarii
 
-| Alert | Priority | Action | Safety |
-|-------|----------|--------|--------|
-| [KubePodCrashLooping](./KubePodCrashLooping/) | 80 | Restart pod | Safe |
-| [KubeDeploymentReplicasMismatch](./KubeDeploymentReplicasMismatch/) | 60 | Rollout restart | Safe |
-| [KubeJobFailed](./KubeJobFailed/) | 40 | Clean up failed job | Safe |
-| [KubeHpaMaxedOut](./KubeHpaMaxedOut/) | 50 | Increase max replicas | Review capacity |
-| [KubeDaemonSetRolloutStuck](./KubeDaemonSetRolloutStuck/) | 55 | Restart rollout | Safe |
+| Alert                                                               | Priority | Action                | Safety          |
+| ------------------------------------------------------------------- | -------- | --------------------- | --------------- |
+| [KubePodCrashLooping](./KubePodCrashLooping/)                       | 80       | Restart pod           | Safe            |
+| [KubeDeploymentReplicasMismatch](./KubeDeploymentReplicasMismatch/) | 60       | Rollout restart       | Safe            |
+| [KubeJobFailed](./KubeJobFailed/)                                   | 40       | Clean up failed job   | Safe            |
+| [KubeHpaMaxedOut](./KubeHpaMaxedOut/)                               | 50       | Increase max replicas | Review capacity |
+| [KubeDaemonSetRolloutStuck](./KubeDaemonSetRolloutStuck/)           | 55       | Restart rollout       | Safe            |
 
 ## Environment Variables
 
@@ -33,18 +33,18 @@ No manual configuration needed in your Operarius specs.
 
 ### Common Variables (from kube-prometheus-stack alerts)
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `OPENFERO_ALERTNAME` | Name of the alert | `KubePodCrashLooping` |
-| `OPENFERO_NAMESPACE` | Kubernetes namespace | `default` |
-| `OPENFERO_POD` | Pod name (pod alerts) | `my-app-7d4b8c9f-x2k4j` |
-| `OPENFERO_CONTAINER` | Container name | `main` |
-| `OPENFERO_DEPLOYMENT` | Deployment name | `my-app` |
-| `OPENFERO_DAEMONSET` | DaemonSet name | `node-exporter` |
-| `OPENFERO_JOB_NAME` | Job name | `backup-job` |
-| `OPENFERO_HORIZONTALPODAUTOSCALER` | HPA name | `my-app-hpa` |
-| `OPENFERO_SEVERITY` | Alert severity | `warning` |
-| `OPENFERO_CLUSTER` | Cluster name | `prod-us-east-1` |
+| Variable                           | Description           | Example                 |
+| ---------------------------------- | --------------------- | ----------------------- |
+| `OPENFERO_ALERTNAME`               | Name of the alert     | `KubePodCrashLooping`   |
+| `OPENFERO_NAMESPACE`               | Kubernetes namespace  | `default`               |
+| `OPENFERO_POD`                     | Pod name (pod alerts) | `my-app-7d4b8c9f-x2k4j` |
+| `OPENFERO_CONTAINER`               | Container name        | `main`                  |
+| `OPENFERO_DEPLOYMENT`              | Deployment name       | `my-app`                |
+| `OPENFERO_DAEMONSET`               | DaemonSet name        | `node-exporter`         |
+| `OPENFERO_JOB_NAME`                | Job name              | `backup-job`            |
+| `OPENFERO_HORIZONTALPODAUTOSCALER` | HPA name              | `my-app-hpa`            |
+| `OPENFERO_SEVERITY`                | Alert severity        | `warning`               |
+| `OPENFERO_CLUSTER`                 | Cluster name          | `prod-us-east-1`        |
 
 ## Testing
 
