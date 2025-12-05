@@ -56,7 +56,7 @@ OPENFERO_IMG ?= openfero:e2e-test
 
 .PHONY: test-e2e
 test-e2e: test-e2e-setup ## Run E2E tests (requires Kind)
-	$(GOTEST) -v ./test/e2e/... -timeout 30m
+	$(GOTEST) -v -tags=e2e ./test/e2e/... -timeout 30m
 
 .PHONY: test-e2e-setup
 test-e2e-setup: ## Set up Kind cluster for E2E tests
