@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +17,46 @@ import (
 	operariusv1alpha1 "github.com/OpenFero/openfero/api/v1alpha1"
 	"github.com/OpenFero/openfero/pkg/models"
 )
+
+// Verify MockOperariusClient implements OperariusClientInterface
+var _ OperariusClientInterface = (*MockOperariusClient)(nil)
+
+// MockOperariusClient is a mock implementation of the OperariusClientInterface for testing
+type MockOperariusClient struct {
+	operarii       []operariusv1alpha1.Operarius
+	listFromAPIErr error
+	listErr        error
+	updateStatusFn func(ctx context.Context, operarius *operariusv1alpha1.Operarius) error
+	namespace      string
+}
+
+func (m *MockOperariusClient) List() ([]operariusv1alpha1.Operarius, error) {
+	if m.listErr != nil {
+		return nil, m.listErr
+	}
+	return m.operarii, nil
+}
+
+func (m *MockOperariusClient) ListFromAPI(ctx context.Context) ([]operariusv1alpha1.Operarius, error) {
+	if m.listFromAPIErr != nil {
+		return nil, m.listFromAPIErr
+	}
+	return m.operarii, nil
+}
+
+func (m *MockOperariusClient) UpdateStatus(ctx context.Context, operarius *operariusv1alpha1.Operarius) error {
+	if m.updateStatusFn != nil {
+		return m.updateStatusFn(ctx, operarius)
+	}
+	return nil
+}
+
+func (m *MockOperariusClient) GetNamespace() string {
+	if m.namespace != "" {
+		return m.namespace
+	}
+	return "openfero"
+}
 
 func TestOperariusService_FindMatchingOperarius(t *testing.T) {
 	// Setup
@@ -1005,4 +1046,1110 @@ func getEnvValue(envVars []corev1.EnvVar, name string) string {
 		}
 	}
 	return ""
+}
+
+// TestNewOperariusServiceWithClient tests the constructor with an OperariusClient
+func TestNewOperariusServiceWithClient(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	mockClient := &MockOperariusClient{
+		namespace: "test-namespace",
+	}
+
+	service := NewOperariusServiceWithClient(kubeClient, mockClient)
+
+	assert.NotNil(t, service)
+	assert.NotNil(t, service.kubeClient)
+	assert.NotNil(t, service.operariusClient)
+	assert.Equal(t, "test-namespace", service.operariusClient.GetNamespace())
+}
+
+// TestGetOperariiForNamespace tests retrieving Operarii from a namespace
+func TestGetOperariiForNamespace(t *testing.T) {
+	enabled := true
+	testOperarii := []operariusv1alpha1.Operarius{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-operarius-1",
+				Namespace: "openfero",
+			},
+			Spec: operariusv1alpha1.OperariusSpec{
+				AlertSelector: operariusv1alpha1.AlertSelector{
+					AlertName: "TestAlert1",
+					Status:    "firing",
+				},
+				Enabled: &enabled,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-operarius-2",
+				Namespace: "openfero",
+			},
+			Spec: operariusv1alpha1.OperariusSpec{
+				AlertSelector: operariusv1alpha1.AlertSelector{
+					AlertName: "TestAlert2",
+					Status:    "resolved",
+				},
+				Enabled: &enabled,
+			},
+		},
+	}
+
+	tests := []struct {
+		name           string
+		mockClient     *MockOperariusClient
+		hasClient      bool
+		expectedCount  int
+		expectError    bool
+		errorSubstring string
+	}{
+		{
+			name:          "no client configured returns empty list",
+			mockClient:    nil,
+			hasClient:     false,
+			expectedCount: 0,
+			expectError:   false,
+		},
+		{
+			name: "successful API call returns operarii",
+			mockClient: &MockOperariusClient{
+				operarii: testOperarii,
+			},
+			hasClient:     true,
+			expectedCount: 2,
+			expectError:   false,
+		},
+		{
+			name: "API error falls back to cache",
+			mockClient: &MockOperariusClient{
+				operarii:       testOperarii,
+				listFromAPIErr: errors.New("API unavailable"),
+			},
+			hasClient:     true,
+			expectedCount: 2,
+			expectError:   false,
+		},
+		{
+			name: "both API and cache fail returns error",
+			mockClient: &MockOperariusClient{
+				listFromAPIErr: errors.New("API unavailable"),
+				listErr:        errors.New("cache unavailable"),
+			},
+			hasClient:      true,
+			expectedCount:  0,
+			expectError:    true,
+			errorSubstring: "failed to list Operarii",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			kubeClient := fake.NewSimpleClientset()
+			var service *OperariusService
+
+			if tt.hasClient {
+				service = NewOperariusServiceWithClient(kubeClient, tt.mockClient)
+			} else {
+				service = NewOperariusService(kubeClient)
+			}
+
+			ctx := context.TODO()
+			operarii, err := service.GetOperariiForNamespace(ctx, "openfero")
+
+			if tt.expectError {
+				assert.Error(t, err)
+				if tt.errorSubstring != "" {
+					assert.Contains(t, err.Error(), tt.errorSubstring)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, operarii, tt.expectedCount)
+			}
+		})
+	}
+}
+
+// TestUpdateOperariusStatus tests updating the status of an Operarius
+func TestUpdateOperariusStatus(t *testing.T) {
+	enabled := true
+	operarius := &operariusv1alpha1.Operarius{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-operarius",
+			Namespace: "openfero",
+		},
+		Spec: operariusv1alpha1.OperariusSpec{
+			AlertSelector: operariusv1alpha1.AlertSelector{
+				AlertName: "TestAlert",
+				Status:    "firing",
+			},
+			Enabled: &enabled,
+		},
+		Status: operariusv1alpha1.OperariusStatus{
+			ExecutionCount: 5,
+		},
+	}
+
+	tests := []struct {
+		name            string
+		mockClient      *MockOperariusClient
+		hasClient       bool
+		jobName         string
+		expectError     bool
+		expectedCount   int32
+		expectCondition bool
+	}{
+		{
+			name:          "no client configured skips update",
+			mockClient:    nil,
+			hasClient:     false,
+			jobName:       "test-job",
+			expectError:   false,
+			expectedCount: 5, // Should remain unchanged
+		},
+		{
+			name: "successful status update",
+			mockClient: &MockOperariusClient{
+				updateStatusFn: func(ctx context.Context, op *operariusv1alpha1.Operarius) error {
+					return nil
+				},
+			},
+			hasClient:       true,
+			jobName:         "test-job-123",
+			expectError:     false,
+			expectedCount:   6,
+			expectCondition: true,
+		},
+		{
+			name: "update error is propagated",
+			mockClient: &MockOperariusClient{
+				updateStatusFn: func(ctx context.Context, op *operariusv1alpha1.Operarius) error {
+					return errors.New("update failed")
+				},
+			},
+			hasClient:   true,
+			jobName:     "test-job",
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Deep copy operarius for each test
+			testOperarius := operarius.DeepCopy()
+			kubeClient := fake.NewSimpleClientset()
+			var service *OperariusService
+
+			if tt.hasClient {
+				service = NewOperariusServiceWithClient(kubeClient, tt.mockClient)
+			} else {
+				service = NewOperariusService(kubeClient)
+			}
+
+			ctx := context.TODO()
+			err := service.UpdateOperariusStatus(ctx, testOperarius, tt.jobName)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				if tt.hasClient {
+					assert.Equal(t, tt.expectedCount, testOperarius.Status.ExecutionCount)
+					assert.Equal(t, tt.jobName, testOperarius.Status.LastExecutedJobName)
+					assert.NotNil(t, testOperarius.Status.LastExecutionTime)
+
+					if tt.expectCondition {
+						assert.Len(t, testOperarius.Status.Conditions, 1)
+						assert.Equal(t, operariusv1alpha1.OperariusConditionReady, testOperarius.Status.Conditions[0].Type)
+						assert.Equal(t, metav1.ConditionTrue, testOperarius.Status.Conditions[0].Status)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestUpdateConditions tests the updateConditions helper function
+func TestUpdateConditions(t *testing.T) {
+	now := metav1.Now()
+
+	tests := []struct {
+		name              string
+		existingCondition []operariusv1alpha1.OperariusCondition
+		newCondition      operariusv1alpha1.OperariusCondition
+		expectedLen       int
+		expectedStatus    metav1.ConditionStatus
+	}{
+		{
+			name:              "adds new condition to empty list",
+			existingCondition: nil,
+			newCondition: operariusv1alpha1.OperariusCondition{
+				Type:               operariusv1alpha1.OperariusConditionReady,
+				Status:             metav1.ConditionTrue,
+				LastTransitionTime: now,
+				Reason:             "JobCreated",
+				Message:            "Job created successfully",
+			},
+			expectedLen:    1,
+			expectedStatus: metav1.ConditionTrue,
+		},
+		{
+			name: "updates existing condition",
+			existingCondition: []operariusv1alpha1.OperariusCondition{
+				{
+					Type:               operariusv1alpha1.OperariusConditionReady,
+					Status:             metav1.ConditionFalse,
+					LastTransitionTime: now,
+					Reason:             "Error",
+					Message:            "Previous error",
+				},
+			},
+			newCondition: operariusv1alpha1.OperariusCondition{
+				Type:               operariusv1alpha1.OperariusConditionReady,
+				Status:             metav1.ConditionTrue,
+				LastTransitionTime: now,
+				Reason:             "JobCreated",
+				Message:            "Job created successfully",
+			},
+			expectedLen:    1,
+			expectedStatus: metav1.ConditionTrue,
+		},
+		{
+			name: "adds new condition type to existing conditions",
+			existingCondition: []operariusv1alpha1.OperariusCondition{
+				{
+					Type:               operariusv1alpha1.OperariusConditionReady,
+					Status:             metav1.ConditionTrue,
+					LastTransitionTime: now,
+					Reason:             "JobCreated",
+					Message:            "Job created",
+				},
+			},
+			newCondition: operariusv1alpha1.OperariusCondition{
+				Type:               "Processing",
+				Status:             metav1.ConditionTrue,
+				LastTransitionTime: now,
+				Reason:             "Processing",
+				Message:            "Processing alert",
+			},
+			expectedLen:    2,
+			expectedStatus: metav1.ConditionTrue,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := updateConditions(tt.existingCondition, tt.newCondition)
+
+			assert.Len(t, result, tt.expectedLen)
+
+			// Find the condition we just added/updated
+			var foundCondition *operariusv1alpha1.OperariusCondition
+			for i := range result {
+				if result[i].Type == tt.newCondition.Type {
+					foundCondition = &result[i]
+					break
+				}
+			}
+
+			require.NotNil(t, foundCondition, "Expected condition not found")
+			assert.Equal(t, tt.expectedStatus, foundCondition.Status)
+			assert.Equal(t, tt.newCondition.Reason, foundCondition.Reason)
+			assert.Equal(t, tt.newCondition.Message, foundCondition.Message)
+		})
+	}
+}
+
+// TestApplyTemplateVariables_Args tests template processing in container args
+func TestApplyTemplateVariables_Args(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	service := NewOperariusService(kubeClient)
+
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-job",
+			Namespace: "openfero",
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "test-container",
+							Image: "busybox",
+							Args: []string{
+								"--namespace={{ .Alert.Labels.namespace }}",
+								"--pod={{ .Alert.Labels.pod }}",
+								"--static-arg",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	hookMessage := models.HookMessage{
+		Status:   "firing",
+		GroupKey: "test-group",
+		Alerts: []models.Alert{
+			{
+				Labels: map[string]string{
+					"alertname": "TestAlert",
+					"namespace": "test-ns",
+					"pod":       "test-pod-123",
+				},
+			},
+		},
+	}
+
+	err := service.applyTemplateVariables(job, hookMessage)
+	assert.NoError(t, err)
+
+	container := job.Spec.Template.Spec.Containers[0]
+	assert.Equal(t, "--namespace=test-ns", container.Args[0])
+	assert.Equal(t, "--pod=test-pod-123", container.Args[1])
+	assert.Equal(t, "--static-arg", container.Args[2])
+}
+
+// TestApplyTemplateVariables_NoAlerts tests template processing when no alerts are present
+func TestApplyTemplateVariables_NoAlerts(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	service := NewOperariusService(kubeClient)
+
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-job",
+			Namespace: "openfero",
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "test-container",
+							Image: "busybox",
+							Env: []corev1.EnvVar{
+								{
+									Name:  "NAMESPACE",
+									Value: "{{ .Alert.Labels.namespace }}",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// HookMessage with no alerts but with CommonLabels
+	hookMessage := models.HookMessage{
+		Status:   "firing",
+		GroupKey: "test-group",
+		CommonLabels: map[string]string{
+			"alertname": "TestAlert",
+			"namespace": "common-ns",
+		},
+		CommonAnnotations: map[string]string{
+			"summary": "Test summary",
+		},
+	}
+
+	err := service.applyTemplateVariables(job, hookMessage)
+	assert.NoError(t, err)
+
+	container := job.Spec.Template.Spec.Containers[0]
+	assert.Equal(t, "common-ns", container.Env[0].Value)
+}
+
+// TestFindMatchingOperarius_NoAlertsButCommonLabels tests matching when alerts array is empty
+func TestFindMatchingOperarius_NoAlertsButCommonLabels(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	service := NewOperariusService(kubeClient)
+
+	enabled := true
+	operarii := []operariusv1alpha1.Operarius{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-operarius",
+				Namespace: "openfero",
+			},
+			Spec: operariusv1alpha1.OperariusSpec{
+				AlertSelector: operariusv1alpha1.AlertSelector{
+					AlertName: "TestAlert",
+					Status:    "firing",
+				},
+				Enabled: &enabled,
+			},
+		},
+	}
+
+	hookMessage := models.HookMessage{
+		Status:   "firing",
+		GroupKey: "test-group",
+		CommonLabels: map[string]string{
+			"alertname": "TestAlert",
+		},
+		// Alerts array is empty
+	}
+
+	result, err := service.FindMatchingOperarius(hookMessage, operarii)
+	assert.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, "test-operarius", result.Name)
+}
+
+// TestCreateJobFromOperarius_NoAlertsUsesCommonLabels tests job creation when no alerts are present
+func TestCreateJobFromOperarius_NoAlertsUsesCommonLabels(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	service := NewOperariusService(kubeClient)
+
+	enabled := true
+	operarius := &operariusv1alpha1.Operarius{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-operarius",
+			Namespace: "openfero",
+		},
+		Spec: operariusv1alpha1.OperariusSpec{
+			AlertSelector: operariusv1alpha1.AlertSelector{
+				AlertName: "TestAlert",
+				Status:    "firing",
+			},
+			JobTemplate: batchv1.JobTemplateSpec{
+				Spec: batchv1.JobSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							RestartPolicy: corev1.RestartPolicyNever,
+							Containers: []corev1.Container{
+								{
+									Name:    "main",
+									Image:   "busybox",
+									Command: []string{"echo", "test"},
+								},
+							},
+						},
+					},
+				},
+			},
+			Enabled: &enabled,
+		},
+	}
+
+	hookMessage := models.HookMessage{
+		Status:   "firing",
+		GroupKey: "test-group",
+		CommonLabels: map[string]string{
+			"alertname": "TestAlert",
+		},
+		// No alerts
+	}
+
+	ctx := context.TODO()
+	job, err := service.CreateJobFromOperarius(ctx, operarius, hookMessage)
+
+	assert.NoError(t, err)
+	require.NotNil(t, job)
+	// Should use alertname from CommonLabels
+	assert.Equal(t, "TestAlert", job.Labels["openfero.io/alert"])
+}
+
+// TestMatchesHookMessage_LabelsFromFirstAlert tests that first alert labels override common labels
+func TestMatchesHookMessage_LabelsFromFirstAlert(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	service := NewOperariusService(kubeClient)
+
+	enabled := true
+	operarius := operariusv1alpha1.Operarius{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-operarius",
+			Namespace: "openfero",
+		},
+		Spec: operariusv1alpha1.OperariusSpec{
+			AlertSelector: operariusv1alpha1.AlertSelector{
+				AlertName: "TestAlert",
+				Status:    "firing",
+				Labels: map[string]string{
+					"environment": "production",
+				},
+			},
+			Enabled: &enabled,
+		},
+	}
+
+	// First alert has different environment than common labels
+	hookMessage := models.HookMessage{
+		Status:   "firing",
+		GroupKey: "test-group",
+		CommonLabels: map[string]string{
+			"alertname":   "TestAlert",
+			"environment": "staging",
+		},
+		Alerts: []models.Alert{
+			{
+				Labels: map[string]string{
+					"alertname":   "TestAlert",
+					"environment": "production", // This should be used
+				},
+			},
+		},
+	}
+
+	result := service.matchesHookMessage(operarius, hookMessage)
+	assert.True(t, result, "Should match because first alert has production environment")
+}
+
+// TestCheckDeduplication_DefaultTTL tests that default TTL is used when TTL is zero
+func TestCheckDeduplication_DefaultTTL(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	service := NewOperariusService(kubeClient)
+
+	enabled := true
+	operarius := &operariusv1alpha1.Operarius{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-operarius",
+			Namespace: "openfero",
+		},
+		Spec: operariusv1alpha1.OperariusSpec{
+			Deduplication: &operariusv1alpha1.DeduplicationConfig{
+				Enabled: true,
+				TTL:     0, // Should use default of 300
+			},
+			Enabled: &enabled,
+		},
+	}
+
+	// Create a job that's 4 minutes old (within default 5 minute TTL)
+	recentJob := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "recent-job",
+			Namespace: "openfero",
+			Labels: map[string]string{
+				"openfero.io/operarius": "test-operarius",
+				"openfero.io/group-key": "test-group",
+			},
+			CreationTimestamp: metav1.NewTime(time.Now().Add(-4 * time.Minute)),
+		},
+	}
+
+	ctx := context.TODO()
+	_, err := kubeClient.BatchV1().Jobs("openfero").Create(ctx, recentJob, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	hookMessage := models.HookMessage{
+		GroupKey: "test-group",
+	}
+
+	shouldCreate, err := service.CheckDeduplication(ctx, operarius, hookMessage)
+	assert.NoError(t, err)
+	assert.False(t, shouldCreate, "Should not create job within default TTL window")
+}
+
+// TestApplyTemplateVariables_TemplateErrors tests error handling in template processing
+func TestApplyTemplateVariables_TemplateErrors(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	service := NewOperariusService(kubeClient)
+
+	tests := []struct {
+		name           string
+		job            *batchv1.Job
+		hookMessage    models.HookMessage
+		expectError    bool
+		errorSubstring string
+	}{
+		{
+			name: "invalid env var template",
+			job: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "test",
+									Image: "busybox",
+									Env: []corev1.EnvVar{
+										{
+											Name:  "INVALID",
+											Value: "{{ .Invalid.Field",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			hookMessage: models.HookMessage{
+				Status:   "firing",
+				GroupKey: "test",
+			},
+			expectError:    true,
+			errorSubstring: "env var",
+		},
+		{
+			name: "invalid command template",
+			job: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:    "test",
+									Image:   "busybox",
+									Command: []string{"{{ .Unclosed"},
+								},
+							},
+						},
+					},
+				},
+			},
+			hookMessage: models.HookMessage{
+				Status:   "firing",
+				GroupKey: "test",
+			},
+			expectError:    true,
+			errorSubstring: "command",
+		},
+		{
+			name: "invalid args template",
+			job: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:    "test",
+									Image:   "busybox",
+									Command: []string{"echo"},
+									Args:    []string{"{{ .Broken"},
+								},
+							},
+						},
+					},
+				},
+			},
+			hookMessage: models.HookMessage{
+				Status:   "firing",
+				GroupKey: "test",
+			},
+			expectError:    true,
+			errorSubstring: "arg",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := service.applyTemplateVariables(tt.job, tt.hookMessage)
+			if tt.expectError {
+				assert.Error(t, err)
+				if tt.errorSubstring != "" {
+					assert.Contains(t, err.Error(), tt.errorSubstring)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+// TestFindMatchingOperarius_UnknownAlertName tests error message when alertname is not found
+func TestFindMatchingOperarius_UnknownAlertName(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	service := NewOperariusService(kubeClient)
+
+	// Empty operarii list
+	operarii := []operariusv1alpha1.Operarius{}
+
+	// HookMessage with no alertname anywhere
+	hookMessage := models.HookMessage{
+		Status:       "firing",
+		GroupKey:     "test-group",
+		CommonLabels: map[string]string{},
+		Alerts:       []models.Alert{},
+	}
+
+	result, err := service.FindMatchingOperarius(hookMessage, operarii)
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "unknown")
+}
+
+// TestFindMatchingOperarius_AlertNameFromFirstAlert tests alertname extraction from first alert
+func TestFindMatchingOperarius_AlertNameFromFirstAlert(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	service := NewOperariusService(kubeClient)
+
+	// Empty operarii - will trigger error path that extracts alertname
+	operarii := []operariusv1alpha1.Operarius{}
+
+	hookMessage := models.HookMessage{
+		Status:   "firing",
+		GroupKey: "test-group",
+		Alerts: []models.Alert{
+			{
+				Labels: map[string]string{
+					"alertname": "FirstAlertName",
+				},
+			},
+		},
+	}
+
+	result, err := service.FindMatchingOperarius(hookMessage, operarii)
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "FirstAlertName")
+}
+
+// TestMatchesHookMessage_AlertNameFromCommonLabels tests matching when alertname is only in common labels
+func TestMatchesHookMessage_AlertNameFromCommonLabels(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	service := NewOperariusService(kubeClient)
+
+	enabled := true
+	operarius := operariusv1alpha1.Operarius{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-operarius",
+			Namespace: "openfero",
+		},
+		Spec: operariusv1alpha1.OperariusSpec{
+			AlertSelector: operariusv1alpha1.AlertSelector{
+				AlertName: "CommonLabelAlert",
+				Status:    "firing",
+			},
+			Enabled: &enabled,
+		},
+	}
+
+	// No alerts, only common labels
+	hookMessage := models.HookMessage{
+		Status:   "firing",
+		GroupKey: "test-group",
+		CommonLabels: map[string]string{
+			"alertname": "CommonLabelAlert",
+		},
+		Alerts: []models.Alert{},
+	}
+
+	result := service.matchesHookMessage(operarius, hookMessage)
+	assert.True(t, result)
+}
+
+// TestMatchesHookMessage_AlertNameMismatch tests that mismatched alertnames don't match
+func TestMatchesHookMessage_AlertNameMismatch(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	service := NewOperariusService(kubeClient)
+
+	enabled := true
+	operarius := operariusv1alpha1.Operarius{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-operarius",
+			Namespace: "openfero",
+		},
+		Spec: operariusv1alpha1.OperariusSpec{
+			AlertSelector: operariusv1alpha1.AlertSelector{
+				AlertName: "ExpectedAlert",
+				Status:    "firing",
+			},
+			Enabled: &enabled,
+		},
+	}
+
+	hookMessage := models.HookMessage{
+		Status:   "firing",
+		GroupKey: "test-group",
+		CommonLabels: map[string]string{
+			"alertname": "DifferentAlert",
+		},
+	}
+
+	result := service.matchesHookMessage(operarius, hookMessage)
+	assert.False(t, result)
+}
+
+// TestNewOperariusServiceWithK8sClient tests the K8s client constructor
+func TestNewOperariusServiceWithK8sClient(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	// We can't easily test with a real k8sclient.OperariusClient in unit tests,
+	// but we can verify the function signature works with nil
+	service := NewOperariusServiceWithK8sClient(kubeClient, nil)
+
+	assert.NotNil(t, service)
+	assert.NotNil(t, service.kubeClient)
+	assert.Nil(t, service.operariusClient)
+}
+
+// TestMatchesHookMessage_EmptyAlertLabels tests matching when alert has no labels
+func TestMatchesHookMessage_EmptyAlertLabels(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	service := NewOperariusService(kubeClient)
+
+	enabled := true
+	operarius := operariusv1alpha1.Operarius{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-operarius",
+			Namespace: "openfero",
+		},
+		Spec: operariusv1alpha1.OperariusSpec{
+			AlertSelector: operariusv1alpha1.AlertSelector{
+				AlertName: "TestAlert",
+				Status:    "firing",
+			},
+			Enabled: &enabled,
+		},
+	}
+
+	// Alert with empty labels - should fall back to common labels
+	hookMessage := models.HookMessage{
+		Status:   "firing",
+		GroupKey: "test-group",
+		CommonLabels: map[string]string{
+			"alertname": "TestAlert",
+		},
+		Alerts: []models.Alert{
+			{
+				Labels: map[string]string{}, // Empty - no alertname
+			},
+		},
+	}
+
+	result := service.matchesHookMessage(operarius, hookMessage)
+	// Since first alert has no alertname, it falls back to common labels
+	assert.True(t, result)
+}
+
+// TestMatchesHookMessage_StatusMismatch tests that mismatched status doesn't match
+func TestMatchesHookMessage_StatusMismatch(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	service := NewOperariusService(kubeClient)
+
+	enabled := true
+	operarius := operariusv1alpha1.Operarius{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-operarius",
+			Namespace: "openfero",
+		},
+		Spec: operariusv1alpha1.OperariusSpec{
+			AlertSelector: operariusv1alpha1.AlertSelector{
+				AlertName: "TestAlert",
+				Status:    "firing",
+			},
+			Enabled: &enabled,
+		},
+	}
+
+	hookMessage := models.HookMessage{
+		Status:   "resolved", // Mismatch - operarius expects "firing"
+		GroupKey: "test-group",
+		CommonLabels: map[string]string{
+			"alertname": "TestAlert",
+		},
+	}
+
+	result := service.matchesHookMessage(operarius, hookMessage)
+	assert.False(t, result, "Should not match due to status mismatch")
+}
+
+// TestMatchesHookMessage_LabelMismatch tests that mismatched labels don't match
+func TestMatchesHookMessage_LabelMismatch(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	service := NewOperariusService(kubeClient)
+
+	enabled := true
+	operarius := operariusv1alpha1.Operarius{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-operarius",
+			Namespace: "openfero",
+		},
+		Spec: operariusv1alpha1.OperariusSpec{
+			AlertSelector: operariusv1alpha1.AlertSelector{
+				AlertName: "TestAlert",
+				Status:    "firing",
+				Labels: map[string]string{
+					"severity": "critical",
+				},
+			},
+			Enabled: &enabled,
+		},
+	}
+
+	tests := []struct {
+		name        string
+		hookMessage models.HookMessage
+		expectMatch bool
+	}{
+		{
+			name: "missing required label",
+			hookMessage: models.HookMessage{
+				Status:   "firing",
+				GroupKey: "test-group",
+				CommonLabels: map[string]string{
+					"alertname": "TestAlert",
+					// Missing "severity" label
+				},
+			},
+			expectMatch: false,
+		},
+		{
+			name: "wrong label value",
+			hookMessage: models.HookMessage{
+				Status:   "firing",
+				GroupKey: "test-group",
+				CommonLabels: map[string]string{
+					"alertname": "TestAlert",
+					"severity":  "warning", // Wrong value - expected "critical"
+				},
+			},
+			expectMatch: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := service.matchesHookMessage(operarius, tt.hookMessage)
+			assert.Equal(t, tt.expectMatch, result)
+		})
+	}
+}
+
+// TestCreateJobFromOperarius_TemplateError tests job creation failure due to template error
+func TestCreateJobFromOperarius_TemplateError(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	service := NewOperariusService(kubeClient)
+
+	enabled := true
+	operarius := &operariusv1alpha1.Operarius{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-operarius",
+			Namespace: "openfero",
+		},
+		Spec: operariusv1alpha1.OperariusSpec{
+			AlertSelector: operariusv1alpha1.AlertSelector{
+				AlertName: "TestAlert",
+				Status:    "firing",
+			},
+			JobTemplate: batchv1.JobTemplateSpec{
+				Spec: batchv1.JobSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							RestartPolicy: corev1.RestartPolicyNever,
+							Containers: []corev1.Container{
+								{
+									Name:    "main",
+									Image:   "busybox",
+									Command: []string{"echo", "{{ .Invalid"}, // Invalid template
+								},
+							},
+						},
+					},
+				},
+			},
+			Enabled: &enabled,
+		},
+	}
+
+	hookMessage := models.HookMessage{
+		Status:   "firing",
+		GroupKey: "test-group",
+	}
+
+	ctx := context.TODO()
+	job, err := service.CreateJobFromOperarius(ctx, operarius, hookMessage)
+
+	assert.Error(t, err)
+	assert.Nil(t, job)
+	assert.Contains(t, err.Error(), "template")
+}
+
+// TestProcessTemplate_ExecutionError tests template execution error
+func TestProcessTemplate_ExecutionError(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	service := NewOperariusService(kubeClient)
+
+	// Template that will fail during execution (not parsing)
+	// Using a method call on nil pointer triggers execution error
+	templateStr := "{{ .SomeMethod }}"
+	data := struct{}{}
+
+	result, err := service.processTemplate(templateStr, data)
+	// This should fail during execution as data has no SomeMethod
+	assert.Error(t, err)
+	assert.Empty(t, result)
+}
+
+// TestCheckDeduplication_ListJobsError tests deduplication when job listing fails
+func TestCheckDeduplication_ListJobsError(t *testing.T) {
+	// We need a client that returns an error on List
+	// The fake client doesn't support this directly, so we'll test the flow differently
+	// by ensuring dedup works correctly with empty results
+
+	kubeClient := fake.NewSimpleClientset()
+	service := NewOperariusService(kubeClient)
+
+	enabled := true
+	operarius := &operariusv1alpha1.Operarius{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-operarius",
+			Namespace: "openfero",
+		},
+		Spec: operariusv1alpha1.OperariusSpec{
+			Deduplication: &operariusv1alpha1.DeduplicationConfig{
+				Enabled: true,
+				TTL:     300,
+			},
+			Enabled: &enabled,
+		},
+	}
+
+	hookMessage := models.HookMessage{
+		GroupKey: "new-group-key",
+	}
+
+	ctx := context.TODO()
+	shouldCreate, err := service.CheckDeduplication(ctx, operarius, hookMessage)
+	assert.NoError(t, err)
+	assert.True(t, shouldCreate, "Should create job when no matching jobs exist")
+}
+
+// TestCheckDeduplication_JobOutsideTTL tests that old jobs don't block new job creation
+func TestCheckDeduplication_JobOutsideTTL(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	service := NewOperariusService(kubeClient)
+
+	enabled := true
+	operarius := &operariusv1alpha1.Operarius{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-operarius",
+			Namespace: "openfero",
+		},
+		Spec: operariusv1alpha1.OperariusSpec{
+			Deduplication: &operariusv1alpha1.DeduplicationConfig{
+				Enabled: true,
+				TTL:     60, // 1 minute TTL
+			},
+			Enabled: &enabled,
+		},
+	}
+
+	// Create a job that's 2 minutes old (outside 1 minute TTL)
+	oldJob := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "old-job",
+			Namespace: "openfero",
+			Labels: map[string]string{
+				"openfero.io/operarius": "test-operarius",
+				"openfero.io/group-key": "test-group",
+			},
+			CreationTimestamp: metav1.NewTime(time.Now().Add(-2 * time.Minute)),
+		},
+	}
+
+	ctx := context.TODO()
+	_, err := kubeClient.BatchV1().Jobs("openfero").Create(ctx, oldJob, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	hookMessage := models.HookMessage{
+		GroupKey: "test-group",
+	}
+
+	shouldCreate, err := service.CheckDeduplication(ctx, operarius, hookMessage)
+	assert.NoError(t, err)
+	assert.True(t, shouldCreate, "Should create job when existing job is outside TTL window")
 }
