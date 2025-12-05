@@ -41,7 +41,7 @@ kubectl get crd operariuses.openfero.io
 
 ### Step 2: Convert ConfigMaps to Operarius CRDs
 
-#### Before (ConfigMap):
+#### Before (ConfigMap)
 
 ```yaml
 apiVersion: v1
@@ -56,7 +56,7 @@ data:
     kubectl delete pod {{ .Alert.Labels.pod }} -n {{ .Alert.Labels.namespace }}
 ```
 
-#### After (Operarius CRD):
+#### After (Operarius CRD)
 
 ```yaml
 apiVersion: openfero.io/v1alpha1
