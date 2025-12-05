@@ -4,6 +4,17 @@
 
 This guide covers the migration from ConfigMap-based remediation jobs to Operarius Custom Resource Definitions (CRDs) in OpenFero.
 
+> **Deprecation Notice:** ConfigMap-based Operarii are deprecated and will be removed in a future major version. We strongly recommend migrating to Operarius CRDs.
+
+## Important: No Parallel Operation
+
+OpenFero does **not** support running ConfigMap-based and CRD-based Operarii simultaneously within the same instance. The migration process requires:
+
+1. Converting **all** existing ConfigMaps to Operarius CRDs
+2. Testing the new CRDs (optionally in a staging environment)
+3. Switching the mode via flag/configuration
+4. Removing old ConfigMaps after verification
+
 ## Benefits of Operarius CRDs
 
 ### 1. Schema Validation
@@ -91,18 +102,34 @@ spec:
 
 ### Step 3: Enable CRD Mode
 
-Update your OpenFero deployment to use Operarius CRDs:
+Enable Operarius CRD mode in your OpenFero deployment.
 
-```go
-// In main.go or your initialization code
-operariusService := services.NewOperariusService(kubeClient)
+> **Important:** OpenFero does not support parallel operation of ConfigMap and CRD modes.
+> You must convert ALL your ConfigMaps to Operarius CRDs before switching modes.
 
-server := &handlers.Server{
-    KubeClient:       kubeClient,
-    AlertStore:       alertStore,
-    OperariusService: operariusService,
-    UseOperariusCRDs: true,  // Enable CRD mode
-}
+#### Option A: Using Helm (Recommended)
+
+Update your Helm values:
+
+```yaml
+# values.yaml
+operarius:
+  enabled: true
+  useOperariusCRDs: true
+```
+
+Then upgrade your release:
+
+```bash
+helm upgrade openfero ./charts/openfero -f values.yaml
+```
+
+#### Option B: Using Command Line Flag
+
+If running OpenFero directly, add the `--useOperariusCRDs` flag:
+
+```bash
+./openfero --useOperariusCRDs=true
 ```
 
 ### Step 4: Test the Migration
@@ -287,10 +314,21 @@ kubectl get operarius -o jsonpath='{.status.conditions}'
 
 If you need to rollback to ConfigMap mode:
 
-1. **Disable CRD mode**:
+1. **Disable CRD mode** using one of these methods:
 
-   ```go
-   server.UseOperariusCRDs = false
+   **Helm:**
+   ```yaml
+   # values.yaml
+   operarius:
+     useOperariusCRDs: false
+   ```
+   ```bash
+   helm upgrade openfero ./charts/openfero -f values.yaml
+   ```
+
+   **Command Line:**
+   ```bash
+   ./openfero --useOperariusCRDs=false
    ```
 
 2. **Restore ConfigMaps** from backup
