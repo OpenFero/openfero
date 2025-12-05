@@ -78,7 +78,10 @@ func (s *Server) AlertsPostHandler(w http.ResponseWriter, r *http.Request) {
 		// New CRD-based approach
 		s.handleOperariusBasedJobs(r.Context(), message)
 	} else {
-		// Legacy ConfigMap-based approach
+		// Legacy ConfigMap-based approach - DEPRECATED in v0.17.0, will be removed in v0.18.0
+		log.Warn("DEPRECATION: ConfigMap-based remediation is deprecated and will be removed in v0.18.0. Please migrate to Operarius CRDs. See docs/operarius-crd-migration.md for migration guide.",
+			zap.String("alertname", message.CommonLabels["alertname"]),
+			zap.String("groupKey", message.GroupKey))
 		log.Debug("Creating response jobs (legacy mode)",
 			zap.Int("jobCount", alertcount),
 			zap.String("groupKey", message.GroupKey))
