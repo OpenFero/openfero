@@ -4,7 +4,7 @@
 
 This guide covers the migration from ConfigMap-based remediation jobs to Operarius Custom Resource Definitions (CRDs) in OpenFero.
 
-> **Deprecation Notice:** ConfigMap-based Operarii are deprecated and will be removed in a future major version. We strongly recommend migrating to Operarius CRDs.
+> **Deprecation Notice:** ConfigMap-based Operarii are deprecated and will be removed in a future version. We strongly recommend migrating to Operarius CRDs.
 
 ## Important: No Parallel Operation
 
