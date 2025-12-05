@@ -121,6 +121,20 @@ test-frontend:
 
 ## Release Workflow
 
+### Git Workflow
+
+1. **Feature Development**: Feature-Branch -> PR -> main
+2. **Release**: Update `CHANGELOG.md` + `frontend/package.json`, then tag:
+   ```bash
+   git tag vX.Y.Z && git push origin vX.Y.Z
+   ```
+3. **Hotfix** (if main has moved on): Create branch from tag, fix, tag again:
+   ```bash
+   git checkout -b hotfix/v0.17.1 v0.17.0
+   # make fix, commit
+   git tag v0.17.1 && git push origin hotfix/v0.17.1 --tags
+   ```
+
 ### Trigger
 
 ```yaml
