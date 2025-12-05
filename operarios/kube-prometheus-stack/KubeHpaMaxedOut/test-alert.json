@@ -1,0 +1,43 @@
+{
+  "version": "4",
+  "groupKey": "{}/{}:{alertname=\"KubeHpaMaxedOut\"}",
+  "status": "firing",
+  "receiver": "openfero",
+  "groupLabels": {
+    "alertname": "KubeHpaMaxedOut"
+  },
+  "commonLabels": {
+    "alertname": "KubeHpaMaxedOut",
+    "severity": "warning",
+    "namespace": "default",
+    "horizontalpodautoscaler": "test-hpa",
+    "cluster": "test-cluster"
+  },
+  "commonAnnotations": {
+    "description": "HPA default/test-hpa has been running at max replicas for longer than 15 minutes.",
+    "summary": "HPA is running at max replicas."
+  },
+  "externalURL": "http://alertmanager:9093",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "KubeHpaMaxedOut",
+        "severity": "warning",
+        "namespace": "default",
+        "horizontalpodautoscaler": "test-hpa",
+        "cluster": "test-cluster",
+        "endpoint": "http",
+        "job": "kube-state-metrics"
+      },
+      "annotations": {
+        "description": "HPA default/test-hpa has been running at max replicas for longer than 15 minutes.",
+        "summary": "HPA is running at max replicas.",
+        "runbook_url": "https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubehpamaxedout"
+      },
+      "startsAt": "2025-01-01T00:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://prometheus:9090/graph"
+    }
+  ]
+}

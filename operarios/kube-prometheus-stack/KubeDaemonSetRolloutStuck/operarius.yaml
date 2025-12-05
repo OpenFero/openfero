@@ -1,0 +1,92 @@
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
+metadata:
+  name: daemonset-rollout-fix
+  namespace: openfero
+spec:
+  alertSelector:
+    alertname: KubeDaemonSetRolloutStuck
+    status: firing
+
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 1800
+      template:
+        spec:
+          serviceAccountName: openfero-daemonset-fixer
+          restartPolicy: Never
+          containers:
+            - name: daemonset-fixer
+              image: bitnami/kubectl:1.31
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  echo "=== KubeDaemonSetRolloutStuck Remediation ==="
+                  echo "DaemonSet: ${OPENFERO_DAEMONSET}"
+                  echo "Namespace: ${OPENFERO_NAMESPACE}"
+                  echo ""
+
+                  # Validate required variables
+                  if [ -z "${OPENFERO_DAEMONSET}" ] || [ -z "${OPENFERO_NAMESPACE}" ]; then
+                    echo "ERROR: Missing required environment variables"
+                    exit 1
+                  fi
+
+                  # Check if DaemonSet exists
+                  if ! kubectl get daemonset "${OPENFERO_DAEMONSET}" -n "${OPENFERO_NAMESPACE}" > /dev/null 2>&1; then
+                    echo "DaemonSet not found"
+                    exit 1
+                  fi
+
+                  # Get rollout status
+                  echo "DaemonSet status:"
+                  kubectl get daemonset "${OPENFERO_DAEMONSET}" -n "${OPENFERO_NAMESPACE}" -o wide
+                  echo ""
+
+                  # Get DaemonSet selector for finding pods
+                  SELECTOR=$(kubectl get daemonset "${OPENFERO_DAEMONSET}" -n "${OPENFERO_NAMESPACE}" -o jsonpath='{.spec.selector.matchLabels}' | tr -d '{}' | sed 's/":"/"=/g; s/","/" -l /g; s/"//g')
+
+                  # Check for pods stuck in non-Running state
+                  echo "=== Non-Running Pods ==="
+                  kubectl get pods -n "${OPENFERO_NAMESPACE}" -l ${SELECTOR} --field-selector=status.phase!=Running 2>/dev/null || echo "No non-running pods found"
+                  echo ""
+
+                  # Delete stuck pods to force recreation
+                  echo "Deleting non-running pods..."
+                  STUCK_PODS=$(kubectl get pods -n "${OPENFERO_NAMESPACE}" -l ${SELECTOR} --field-selector=status.phase!=Running -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true)
+
+                  if [ -n "${STUCK_PODS}" ]; then
+                    for POD in ${STUCK_PODS}; do
+                      echo "Deleting stuck pod: ${POD}"
+                      kubectl delete pod "${POD}" -n "${OPENFERO_NAMESPACE}" --force --grace-period=0 2>/dev/null || true
+                    done
+                  else
+                    echo "No stuck pods to delete"
+                  fi
+                  echo ""
+
+                  # Trigger DaemonSet restart
+                  echo "Triggering DaemonSet rollout restart..."
+                  kubectl rollout restart daemonset/"${OPENFERO_DAEMONSET}" -n "${OPENFERO_NAMESPACE}"
+
+                  # Wait for rollout (timeout 5 minutes)
+                  echo "Waiting for rollout to complete..."
+                  if kubectl rollout status daemonset/"${OPENFERO_DAEMONSET}" -n "${OPENFERO_NAMESPACE}" --timeout=300s; then
+                    echo ""
+                    echo "DaemonSet rollout completed successfully"
+                    exit 0
+                  else
+                    echo ""
+                    echo "Rollout did not complete within timeout"
+                    exit 1
+                  fi
+
+  priority: 55
+  enabled: true
+
+  deduplication:
+    enabled: true
+    ttl: 600

@@ -1,0 +1,75 @@
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
+metadata:
+  name: failed-job-cleanup
+  namespace: openfero
+spec:
+  alertSelector:
+    alertname: KubeJobFailed
+    status: firing
+
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      ttlSecondsAfterFinished: 7200
+      template:
+        spec:
+          serviceAccountName: openfero-job-cleaner
+          restartPolicy: Never
+          containers:
+            - name: job-cleaner
+              image: bitnami/kubectl:1.31
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  echo "=== KubeJobFailed Remediation ==="
+                  echo "Job: ${OPENFERO_JOB_NAME}"
+                  echo "Namespace: ${OPENFERO_NAMESPACE}"
+                  echo ""
+
+                  # Validate required variables
+                  if [ -z "${OPENFERO_JOB_NAME}" ] || [ -z "${OPENFERO_NAMESPACE}" ]; then
+                    echo "ERROR: Missing required environment variables"
+                    exit 1
+                  fi
+
+                  # Check if job exists
+                  if ! kubectl get job "${OPENFERO_JOB_NAME}" -n "${OPENFERO_NAMESPACE}" > /dev/null 2>&1; then
+                    echo "Job not found - may have already been deleted"
+                    exit 0
+                  fi
+
+                  # Get job status
+                  echo "Job status:"
+                  kubectl get job "${OPENFERO_JOB_NAME}" -n "${OPENFERO_NAMESPACE}" -o wide
+                  echo ""
+
+                  # Get pod logs for debugging
+                  echo "=== Failed Pod Logs (last 50 lines) ==="
+                  POD=$(kubectl get pods -n "${OPENFERO_NAMESPACE}" -l job-name="${OPENFERO_JOB_NAME}" \
+                    --field-selector=status.phase=Failed -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+
+                  if [ -n "${POD}" ]; then
+                    kubectl logs "${POD}" -n "${OPENFERO_NAMESPACE}" --tail=50 2>/dev/null || echo "Could not retrieve logs"
+                  else
+                    echo "No failed pods found for job"
+                  fi
+                  echo ""
+
+                  # Delete failed job
+                  echo "Cleaning up failed job..."
+                  kubectl delete job "${OPENFERO_JOB_NAME}" -n "${OPENFERO_NAMESPACE}" --ignore-not-found=true
+
+                  echo ""
+                  echo "Failed job cleaned up successfully"
+                  echo "NOTE: Investigate logs above to fix root cause"
+                  exit 0
+
+  priority: 40
+  enabled: true
+
+  deduplication:
+    enabled: true
+    ttl: 600

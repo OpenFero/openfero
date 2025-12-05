@@ -1,0 +1,63 @@
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
+metadata:
+  name: pod-crashloop-restart
+  namespace: openfero
+spec:
+  alertSelector:
+    alertname: KubePodCrashLooping
+    status: firing
+
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 600
+      template:
+        spec:
+          serviceAccountName: openfero-pod-restarter
+          restartPolicy: Never
+          containers:
+            - name: pod-restarter
+              image: bitnami/kubectl:1.31
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  echo "=== KubePodCrashLooping Remediation ==="
+                  echo "Pod: ${OPENFERO_POD}"
+                  echo "Namespace: ${OPENFERO_NAMESPACE}"
+                  echo "Container: ${OPENFERO_CONTAINER}"
+                  echo ""
+
+                  # Validate required variables
+                  if [ -z "${OPENFERO_POD}" ] || [ -z "${OPENFERO_NAMESPACE}" ]; then
+                    echo "ERROR: Missing required environment variables"
+                    exit 1
+                  fi
+
+                  # Check if pod exists
+                  if ! kubectl get pod "${OPENFERO_POD}" -n "${OPENFERO_NAMESPACE}" > /dev/null 2>&1; then
+                    echo "Pod not found - may have already been deleted"
+                    exit 0
+                  fi
+
+                  # Delete pod to trigger fresh restart
+                  echo "Deleting pod to trigger restart..."
+                  kubectl delete pod "${OPENFERO_POD}" -n "${OPENFERO_NAMESPACE}" --wait=false
+
+                  if [ $? -eq 0 ]; then
+                    echo "Pod deletion triggered successfully"
+                    echo "Kubernetes controller will recreate the pod"
+                    exit 0
+                  else
+                    echo "Failed to delete pod"
+                    exit 1
+                  fi
+
+  priority: 80
+  enabled: true
+
+  deduplication:
+    enabled: true
+    ttl: 300
