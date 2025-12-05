@@ -47,6 +47,10 @@ spec:
               valueFrom:
                 resourceFieldRef:
                   resource: limits.memory
+            {{- if .Values.operarius.enabled }}
+            - name: USE_OPERARIUS_CRDS
+              value: "{{ .Values.operarius.useOperariusCRDs }}"
+            {{- end }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -54,6 +58,10 @@ spec:
           args:
             {{- if include "openfero.shouldSetAlertStoreType" . }}
             - "--alertStoreType=memberlist"
+            {{- end }}
+            {{- if and .Values.operarius.enabled .Values.operarius.useOperariusCRDs }}
+            - "--useOperariusCRDs=true"
+            - "--operariusNamespace={{ .Release.Namespace }}"
             {{- end }}
             {{- with .Values.customArgs }}
             {{- toYaml . | nindent 12 }}

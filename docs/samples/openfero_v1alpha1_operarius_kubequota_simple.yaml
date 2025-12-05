@@ -1,0 +1,60 @@
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
+metadata:
+  name: kubequotaalmostfull-operarius-simple
+  namespace: openfero
+  labels:
+    app: openfero
+    remediation-type: quota-adjustment
+spec:
+  # Alert matching configuration
+  alertSelector:
+    alertname: KubeQuotaAlmostFull
+    status: firing
+    labels:
+      severity: warning
+
+  # Job template - simplified without metadata
+  jobTemplate:
+    spec:
+      # Standard Kubernetes Job spec fields
+      backoffLimit: 3
+      ttlSecondsAfterFinished: 3600 # Clean up after 1 hour
+      activeDeadlineSeconds: 300 # 5 minute timeout
+
+      template:
+        spec:
+          restartPolicy: Never
+          serviceAccountName: openfero-remediation
+          containers:
+            - name: quota-adjuster
+              image: openfero/quota-adjuster:latest
+              env:
+                - name: NAMESPACE
+                  value: "{{ .Alert.Labels.namespace }}"
+                - name: RESOURCE
+                  value: "{{ .Alert.Labels.resource }}"
+                - name: QUOTA_NAME
+                  value: "{{ .Alert.Labels.resourcequota }}"
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  echo "Namespace: $NAMESPACE"
+                  echo "Resource: $RESOURCE"
+                  echo "Quota: $QUOTA_NAME"
+                  echo "Would adjust quota here..."
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "100m"
+
+  # Operarius configuration
+  priority: 75
+  enabled: true
+  deduplication:
+    enabled: true
+    ttl: 1800 # 30 minutes

@@ -1,0 +1,93 @@
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
+metadata:
+  name: kubequotaalmostfull-operarius
+  namespace: openfero
+  labels:
+    app: openfero
+    remediation-type: quota-adjustment
+spec:
+  # Alert matching configuration
+  alertSelector:
+    alertname: KubeQuotaAlmostFull
+    status: firing
+    labels:
+      severity: warning
+
+  # Job template - using the full Kubernetes Job specification
+  jobTemplate:
+    metadata:
+      labels:
+        app: openfero
+        operarius: kubequotaalmostfull
+        remediation: quota-adjustment
+      annotations:
+        description: "Remediation job for KubeQuotaAlmostFull alert"
+        openfero.io/template-variables: "namespace,resource,resourcequota"
+    spec:
+      # Standard Kubernetes Job spec fields
+      backoffLimit: 3
+      ttlSecondsAfterFinished: 3600 # Clean up after 1 hour
+      activeDeadlineSeconds: 300 # 5 minute timeout
+
+      template:
+        metadata:
+          labels:
+            app: openfero
+            remediation: quota-adjustment
+        spec:
+          restartPolicy: Never
+          serviceAccountName: openfero-remediation
+          containers:
+            - name: quota-adjuster
+              image: openfero/quota-adjuster:latest
+              env:
+                - name: NAMESPACE
+                  value: "{{ .Alert.Labels.namespace }}"
+                - name: RESOURCE
+                  value: "{{ .Alert.Labels.resource }}"
+                - name: QUOTA_NAME
+                  value: "{{ .Alert.Labels.resourcequota }}"
+                - name: ALERT_NAME
+                  value: "{{ .Alert.Labels.alertname }}"
+                - name: ALERT_SEVERITY
+                  value: "{{ .Alert.Labels.severity }}"
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  echo "Starting remediation for alert: $ALERT_NAME"
+                  echo "Namespace: $NAMESPACE, Resource: $RESOURCE, Quota: $QUOTA_NAME"
+
+                  # Check current quota usage
+                  kubectl describe resourcequota $QUOTA_NAME -n $NAMESPACE
+
+                  # Adjust quota if needed
+                  if [ "$RESOURCE" = "cpu" ]; then
+                    echo "Increasing CPU quota for namespace $NAMESPACE"
+                    kubectl patch resourcequota $QUOTA_NAME -n $NAMESPACE \
+                      --type='json' \
+                      -p='[{"op": "replace", "path": "/spec/hard/requests.cpu", "value":"2"}]'
+                  elif [ "$RESOURCE" = "memory" ]; then
+                    echo "Increasing memory quota for namespace $NAMESPACE"
+                    kubectl patch resourcequota $QUOTA_NAME -n $NAMESPACE \
+                      --type='json' \
+                      -p='[{"op": "replace", "path": "/spec/hard/requests.memory", "value":"4Gi"}]'
+                  fi
+
+                  echo "Remediation completed successfully"
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "100m"
+
+  # OpenFero-specific configuration
+  deduplication:
+    enabled: true
+    ttl: 300 # Don't create duplicate jobs for 5 minutes
+
+  priority: 100
+  enabled: true

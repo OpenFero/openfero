@@ -50,44 +50,79 @@ curl -X POST http://openfero-service:8080/alert \
 
 ![Shows the Prometheus, Alertmanager components and that Alertmanager notifies the OpenFero component so that OpenFero starts the jobs via Kubernetes API.][comp-dia]
 
-## Operarios definitions
+## Operarios Definitions
 
-The operarios definitions are stored in the namespace in ConfigMaps with the naming convention `openfero-<alertname>-<status>`.
+OpenFero supports two approaches for defining automated remediation actions:
 
-### Example-Names
+### 1. Operarius CRDs (Recommended)
+
+The modern approach uses Kubernetes Custom Resource Definitions (CRDs) that provide schema validation, priority handling, and enhanced features:
+
+```yaml
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
+metadata:
+  name: pod-restart-operarius
+  namespace: openfero
+spec:
+  alertSelector:
+    alertname: PodCrashLooping
+    status: firing
+
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          serviceAccountName: openfero-remediation
+          containers:
+            - name: pod-restarter
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/sh
+                - -c
+                - kubectl delete pod {{ .Alert.Labels.pod }} -n {{ .Alert.Labels.namespace }}
+
+  priority: 50
+  enabled: true
+```
+
+**Benefits of Operarius CRDs:**
+
+- Schema validation and IDE support
+- Priority-based selection when multiple operarii match
+- Deduplication to prevent duplicate job execution
+- Status tracking and monitoring
+- 100% Kubernetes Job API compatibility
+- GitOps-friendly declarative management
+
+See the [Operarius CRD Documentation](docs/operarius-crds.md) for complete details.
+
+### 2. ConfigMaps (Legacy)
+
+The traditional approach stores operarios definitions in ConfigMaps with the naming convention `openfero-<alertname>-<status>`:
+
+#### Example Names
 
 - `openfero-KubeQuotaAlmostReached-firing`
 - `openfero-KubeQuotaAlmostReached-resolved`
 
-### Operarios-Example
+#### ConfigMap Example
 
 ```yaml
-apiVersion: batch/v1
-kind: Job
+apiVersion: v1
+kind: ConfigMap
 metadata:
   name: openfero-kubequotaalmostfull-firing
   labels:
     app: openfero
-spec:
-  parallelism: 1
-  completions: 1
-  template:
-    labels:
-      app: openfero
-    spec:
-      containers:
-        - name: python-job
-          image: python:latest
-          args:
-            - bash
-            - -c
-            - |-
-              echo "Hallo Welt"
-      imagePullPolicy: Always
-      restartPolicy: Never
-      serviceAccount: <desired-sa>
-      serviceAccountName: <desired-sa>
+data:
+  image: python:latest
+  command: |
+    echo "Hello World - Alert: {{ .Alert.Labels.alertname }}"
 ```
+
+**Migration:** Existing ConfigMap-based operarios can be migrated to CRDs. See the [Migration Guide](docs/operarius-crd-migration.md) for step-by-step instructions.
 
 ## Security note
 
