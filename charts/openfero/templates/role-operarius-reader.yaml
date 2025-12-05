@@ -1,0 +1,15 @@
+{{- if .Values.operarius.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "openfero.fullname" . }}-operarius-reader
+  labels:
+    {{- include "openfero.labels" . | nindent 4 }}
+rules:
+- apiGroups: ["openfero.io"]
+  resources: ["operariuses"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["openfero.io"]
+  resources: ["operariuses/status"]
+  verbs: ["get", "update", "patch"]
+{{- end }}
