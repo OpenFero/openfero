@@ -28,7 +28,7 @@ import (
 
 const (
 	kindBinary  = "kind"
-	kindCluster = "openfero-test-e2e"
+	kindCluster = "openfero-e2e"
 )
 
 // Run executes a command and returns its output

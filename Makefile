@@ -53,32 +53,60 @@ test-coverage: ## Run tests with coverage report
 # E2E Test configuration
 KIND_CLUSTER_NAME ?= openfero-e2e
 OPENFERO_IMG ?= openfero:e2e-test
+KIND ?= kind
+E2E_NAMESPACE ?= openfero
 
 .PHONY: test-e2e
 test-e2e: test-e2e-setup ## Run E2E tests (requires Kind)
-	$(GOTEST) -v ./test/e2e/... -timeout 30m
+	KIND=$(KIND) KIND_CLUSTER=$(KIND_CLUSTER_NAME) E2E_NAMESPACE=$(E2E_NAMESPACE) $(GOTEST) -v -tags=e2e ./test/e2e/... -timeout 30m
 
 .PHONY: test-e2e-setup
 test-e2e-setup: ## Set up Kind cluster for E2E tests
-	@echo "Setting up Kind cluster $(KIND_CLUSTER_NAME)..."
-	@kind get clusters | grep -q $(KIND_CLUSTER_NAME) || kind create cluster --name $(KIND_CLUSTER_NAME)
-	@kind get kubeconfig --name $(KIND_CLUSTER_NAME) > /tmp/$(KIND_CLUSTER_NAME)-kubeconfig.yaml
+	@command -v $(KIND) >/dev/null 2>&1 || { \
+		echo "Kind is not installed. Please install Kind manually."; \
+		exit 1; \
+	}
+	@case "$$($(KIND) get clusters)" in \
+		*"$(KIND_CLUSTER_NAME)"*) \
+			echo "Kind cluster '$(KIND_CLUSTER_NAME)' already exists. Skipping creation." ;; \
+		*) \
+			echo "Creating Kind cluster '$(KIND_CLUSTER_NAME)'..."; \
+			$(KIND) create cluster --name $(KIND_CLUSTER_NAME) ;; \
+	esac
+	@echo "Setting kubectl context..."
+	@kubectl cluster-info --context kind-$(KIND_CLUSTER_NAME)
+	@echo "Building OpenFero binary (static)..."
+	$(MAKE) build-static
 	@echo "Building OpenFero image..."
 	docker build -t $(OPENFERO_IMG) -f goreleaser.dockerfile .
 	@echo "Loading image into Kind..."
-	kind load docker-image $(OPENFERO_IMG) --name $(KIND_CLUSTER_NAME)
+	$(KIND) load docker-image $(OPENFERO_IMG) --name $(KIND_CLUSTER_NAME)
 	@echo "Installing CRDs..."
-	KUBECONFIG=/tmp/$(KIND_CLUSTER_NAME)-kubeconfig.yaml kubectl apply --server-side -f $(CRD_DIR)/
+	kubectl apply --server-side --context kind-$(KIND_CLUSTER_NAME) -f $(CRD_DIR)/
+	@echo "Deploying OpenFero..."
+	helm upgrade --install openfero charts/openfero \
+		--kube-context kind-$(KIND_CLUSTER_NAME) \
+		--namespace $(E2E_NAMESPACE) \
+		--create-namespace \
+		--set image.repository=openfero \
+		--set image.tag=e2e-test \
+		--set image.pullPolicy=Never \
+		--set serviceMonitor.enabled=false \
+		--wait --timeout 120s
+	@echo "OpenFero deployed successfully"
 
 .PHONY: test-e2e-teardown
 test-e2e-teardown: ## Tear down Kind cluster used for E2E tests
 	@echo "Deleting Kind cluster $(KIND_CLUSTER_NAME)..."
-	kind delete cluster --name $(KIND_CLUSTER_NAME)
-	rm -f /tmp/$(KIND_CLUSTER_NAME)-kubeconfig.yaml
+	$(KIND) delete cluster --name $(KIND_CLUSTER_NAME)
 
 .PHONY: build
 build: ## Build the OpenFero binary
 	$(GOBUILD) -o openfero .
+
+.PHONY: build-static
+build-static: ## Build statically linked OpenFero binary for containers
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -ldflags="-s -w" -o openfero .
 
 .PHONY: clean
 clean: ## Clean build artifacts

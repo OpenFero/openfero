@@ -353,8 +353,9 @@ func VerifyPath(path string) (string, error) {
 // HealthzGetHandler handles health status requests
 func (s *Server) HealthzGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Debug("Health check requested", zap.String("path", r.URL.Path))
-	w.Header().Set(ContentTypeHeader, ApplicationJSONVal)
+	w.Header().Set(ContentTypeHeader, "text/plain")
 	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("ok"))
 	log.Debug("Health check successful")
 }
 
@@ -371,8 +372,9 @@ func (s *Server) ReadinessGetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set(ContentTypeHeader, ApplicationJSONVal)
+	w.Header().Set(ContentTypeHeader, "text/plain")
 	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("ok"))
 	log.Debug("Readiness check successful",
 		zap.String("namespace", s.KubeClient.ConfigmapNamespace))
 }
