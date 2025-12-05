@@ -8,6 +8,7 @@ import (
 	"github.com/OpenFero/openfero/pkg/alertstore"
 	"github.com/OpenFero/openfero/pkg/kubernetes"
 	log "github.com/OpenFero/openfero/pkg/logging"
+	"github.com/OpenFero/openfero/pkg/metadata"
 	"github.com/OpenFero/openfero/pkg/models"
 	"github.com/OpenFero/openfero/pkg/services"
 	"github.com/OpenFero/openfero/pkg/utils"
@@ -135,8 +136,12 @@ func (s *Server) handleOperariusBasedJobs(ctx context.Context, hookMessage model
 		log.Error("Failed to create job from Operarius",
 			zap.Error(err),
 			zap.String("operarius", operarius.Name))
+		metadata.JobsFailedTotal.Inc()
 		return
 	}
+
+	// Increment successful job creation metric
+	metadata.JobsCreatedTotal.Inc()
 
 	log.Info("Successfully created remediation job",
 		zap.String("jobName", job.Name),
@@ -152,17 +157,16 @@ func (s *Server) handleOperariusBasedJobs(ctx context.Context, hookMessage model
 		// Don't return - job was created successfully, status update is best-effort
 	}
 
-	// Store alert in alert store for tracking
+	// Store alert in alert store for tracking and broadcast to SSE clients
 	for _, alert := range hookMessage.Alerts {
 		jobInfo := &alertstore.JobInfo{
 			JobName:       job.Name,
-			ConfigMapName: operarius.Name + "-operarius", // For compatibility tracking
+			ConfigMapName: operarius.Name, // Operarius name for tracking
 			Image:         getFirstContainerImage(job),
 		}
 
-		if err := s.AlertStore.SaveAlertWithJobInfo(alert.ToAlertStoreAlert(), hookMessage.Status, jobInfo); err != nil {
-			log.Error("Failed to store alert", zap.Error(err))
-		}
+		// Use the service function which handles both storage and SSE broadcast
+		services.SaveAlertWithJobInfo(s.AlertStore, alert, hookMessage.Status, jobInfo)
 	}
 }
 
