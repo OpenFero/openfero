@@ -28,7 +28,6 @@ jobs:
       id-token: write # Required for OIDC token for Cosign
     env:
       NEW_VERSION: "0.0.0"
-      IS_NIGHTLY: false
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@df199fb7be9f65074067a9eb93f12bb4c5547cf2 # v2.13.3
@@ -80,18 +79,6 @@ jobs:
           TAG: ${{ github.event.inputs.tag }}
         run: git tag "$TAG"
 
-      - name: Set pre-release flag for nightly builds
-        id: set-prerelease
-        env:
-          INPUT_TAG: ${{ github.event.inputs.tag }}
-          GITHUB_REF_NAME: ${{ github.ref }}
-        run: |
-          if [[ "$INPUT_TAG" =~ .*-nightly.* ]] || [[ "$GITHUB_REF_NAME" =~ .*-nightly.* ]]; then
-            echo "IS_NIGHTLY=true" >> "$GITHUB_ENV"
-          else
-            echo "IS_NIGHTLY=false" >> "$GITHUB_ENV"
-          fi
-
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6.4.0
         with:
@@ -126,12 +113,10 @@ jobs:
           echo "Signing image: ${IMAGE_NAME}"
           cosign sign --yes "${IMAGE_NAME}"
 
-          # Sign latest tag if not a pre-release
-          if [[ ! "$IMAGE_TAG" =~ .*-nightly.* ]]; then
-            LATEST_IMAGE="ghcr.io/openfero/openfero:latest"
-            echo "Signing latest tag: ${LATEST_IMAGE}"
-            cosign sign --yes "${LATEST_IMAGE}"
-          fi
+          # Sign latest tag
+          LATEST_IMAGE="ghcr.io/openfero/openfero:latest"
+          echo "Signing latest tag: ${LATEST_IMAGE}"
+          cosign sign --yes "${LATEST_IMAGE}"
 
           echo "Container images signed successfully"
 
@@ -142,7 +127,6 @@ jobs:
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" || echo "Verification completed (may show warnings for new signatures)"
 
       - name: Sign release artifacts
-        if: ${{ !contains(github.ref, '-nightly') }}
         run: |
           echo "Signing release artifacts..."
 
@@ -171,7 +155,6 @@ jobs:
 
       - name: Package charts
         id: chart-releaser
-        if: ${{ !contains(github.ref, '-nightly') }}
         env:
           INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
@@ -192,7 +175,6 @@ jobs:
 
       - name: Push charts to GHCR
         id: push-charts
-        if: ${{ !contains(github.ref, '-nightly') }}
         run: |
           shopt -s nullglob
           for pkg in .cr-release-packages/*; do
@@ -204,7 +186,6 @@ jobs:
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@84ae59a2cdc2258d6fa0732dd66352dddae2a412 # v7.0.9
-        if: ${{ !contains(github.ref, '-nightly') }}
         with:
           commit-message: Bump chart version to ${{ env.NEW_VERSION }}
           title: Bump chart version to ${{ env.NEW_VERSION }}
@@ -216,7 +197,6 @@ jobs:
           delete-branch: true
 
       - name: Upload signatures to release
-        if: ${{ !contains(github.ref, '-nightly') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           INPUT_TAG: ${{ github.event.inputs.tag }}
