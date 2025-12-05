@@ -317,16 +317,19 @@ If you need to rollback to ConfigMap mode:
 1. **Disable CRD mode** using one of these methods:
 
    **Helm:**
+
    ```yaml
    # values.yaml
    operarius:
      useOperariusCRDs: false
    ```
+
    ```bash
    helm upgrade openfero ./charts/openfero -f values.yaml
    ```
 
    **Command Line:**
+
    ```bash
    ./openfero --useOperariusCRDs=false
    ```
