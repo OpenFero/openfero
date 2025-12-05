@@ -47,10 +47,10 @@ var _ = Describe("OpenFero Operarius CRD", Ordered, func() {
 		_, err = utils.Run(cmd)
 		Expect(err).NotTo(HaveOccurred())
 
-		By("installing Operarius CRDs")
-		cmd = exec.Command("kubectl", "apply", "-f", "charts/openfero/crds/")
-		_, err = utils.Run(cmd)
-		Expect(err).NotTo(HaveOccurred())
+		By("verifying Operarius CRDs are installed")
+		cmd = exec.Command("kubectl", "get", "crd", "operariuses.openfero.io")
+		output, err = utils.Run(cmd)
+		Expect(err).NotTo(HaveOccurred(), "CRDs should be pre-installed by make test-e2e-setup: %s", output)
 	})
 
 	AfterAll(func() {

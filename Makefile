@@ -72,10 +72,14 @@ test-e2e-setup: ## Set up Kind cluster for E2E tests
 			echo "Creating Kind cluster '$(KIND_CLUSTER_NAME)'..."; \
 			$(KIND) create cluster --name $(KIND_CLUSTER_NAME) ;; \
 	esac
+	@echo "Setting kubectl context..."
+	@kubectl cluster-info --context kind-$(KIND_CLUSTER_NAME)
 	@echo "Building OpenFero image..."
 	docker build -t $(OPENFERO_IMG) -f goreleaser.dockerfile .
 	@echo "Loading image into Kind..."
 	$(KIND) load docker-image $(OPENFERO_IMG) --name $(KIND_CLUSTER_NAME)
+	@echo "Installing CRDs..."
+	kubectl apply --context kind-$(KIND_CLUSTER_NAME) -f $(CRD_DIR)/
 
 .PHONY: test-e2e-teardown
 test-e2e-teardown: ## Tear down Kind cluster used for E2E tests
