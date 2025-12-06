@@ -3,13 +3,13 @@ package kubernetes
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"time"
 
 	log "github.com/OpenFero/openfero/pkg/logging"
 	"github.com/OpenFero/openfero/pkg/metadata"
 	"go.uber.org/zap"
 	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -20,12 +20,8 @@ import (
 
 // Client represents a Kubernetes client with necessary stores and configuration
 type Client struct {
-	Clientset               kubernetes.Clientset
-	JobDestinationNamespace string
-	ConfigmapNamespace      string
-	ConfigMapStore          cache.Store
-	JobStore                cache.Store
-	LabelSelector           *metav1.LabelSelector
+	Clientset     kubernetes.Clientset
+	LabelSelector *metav1.LabelSelector
 }
 
 // InitKubeClient initializes a Kubernetes client using in-cluster or kubeconfig
@@ -37,12 +33,23 @@ func InitKubeClient(kubeconfig *string) *kubernetes.Clientset {
 	config, err = rest.InClusterConfig()
 	if err != nil {
 		log.Debug("In-cluster configuration not available, trying kubeconfig file", zap.Error(err))
+
+		kubeconfigPath := *kubeconfig
+		if kubeconfigPath == "" {
+			if home, err := os.UserHomeDir(); err == nil {
+				defaultPath := filepath.Join(home, ".kube", "config")
+				if _, err := os.Stat(defaultPath); err == nil {
+					kubeconfigPath = defaultPath
+				}
+			}
+		}
+
 		// Use kubeconfig file
-		config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
+		config, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath)
 		if err != nil {
 			log.Fatal("Could not create k8s configuration", zap.Error(err))
 		}
-		log.Info("Using kubeconfig file for cluster access", zap.String("kubeconfigPath", *kubeconfig))
+		log.Info("Using kubeconfig file for cluster access", zap.String("kubeconfigPath", kubeconfigPath))
 	} else {
 		log.Info("Using in-cluster configuration")
 	}
@@ -82,57 +89,8 @@ func GetCurrentNamespace() (string, error) {
 	}
 }
 
-// InitConfigMapInformer initializes a ConfigMap informer
-func InitConfigMapInformer(clientset *kubernetes.Clientset, configmapNamespace string, labelSelector *metav1.LabelSelector) cache.Store {
-	// Create informer factory
-	configMapfactory := informers.NewSharedInformerFactoryWithOptions(
-		clientset,
-		time.Hour*1,
-		informers.WithNamespace(configmapNamespace),
-		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
-			options.LabelSelector = metav1.FormatLabelSelector(labelSelector)
-		}),
-	)
-
-	log.Debug("Initializing ConfigMap informer",
-		zap.String("namespace", configmapNamespace),
-		zap.String("labelSelector", metav1.FormatLabelSelector(labelSelector)))
-
-	// Get ConfigMap informer
-	configMapInformer := configMapfactory.Core().V1().ConfigMaps().Informer()
-
-	// Add event handlers
-	if _, err := configMapInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			cm := obj.(*corev1.ConfigMap)
-			log.Debug("ConfigMap added to store", zap.String("name", cm.Name))
-		},
-		UpdateFunc: func(old, new interface{}) {
-			cm := new.(*corev1.ConfigMap)
-			log.Debug("ConfigMap updated in store", zap.String("name", cm.Name))
-		},
-		DeleteFunc: func(obj interface{}) {
-			cm := obj.(*corev1.ConfigMap)
-			log.Debug("ConfigMap removed from store", zap.String("name", cm.Name))
-		},
-	}); err != nil {
-		log.Fatal("Failed to add ConfigMap event handler", zap.Error(err))
-	}
-
-	// Start informer
-	go configMapfactory.Start(context.Background().Done())
-
-	// Wait for cache sync
-	if !cache.WaitForCacheSync(context.Background().Done(), configMapInformer.HasSynced) {
-		log.Fatal("Failed to sync ConfigMap cache", zap.String("namespace", configmapNamespace))
-	}
-	log.Info("ConfigMap cache synced", zap.String("namespace", configmapNamespace))
-
-	return configMapInformer.GetStore()
-}
-
 // InitJobInformer initializes a Job informer
-func InitJobInformer(clientset *kubernetes.Clientset, jobDestinationNamespace string, labelSelector *metav1.LabelSelector) cache.Store {
+func InitJobInformer(clientset *kubernetes.Clientset, jobDestinationNamespace string, labelSelector *metav1.LabelSelector, updateFunc func(oldJob, newJob *batchv1.Job)) cache.Store {
 	// Create informer factory
 	jobFactory := informers.NewSharedInformerFactoryWithOptions(
 		clientset,
@@ -156,6 +114,9 @@ func InitJobInformer(clientset *kubernetes.Clientset, jobDestinationNamespace st
 			job := obj.(*batchv1.Job)
 			log.Debug("Job added", zap.String("job", job.Name), zap.String("namespace", job.Namespace))
 			metadata.JobsCreatedTotal.Inc()
+			if updateFunc != nil {
+				updateFunc(nil, job)
+			}
 		},
 		UpdateFunc: func(old, new interface{}) {
 			oldJob := old.(*batchv1.Job)
@@ -167,6 +128,9 @@ func InitJobInformer(clientset *kubernetes.Clientset, jobDestinationNamespace st
 			if newJob.Status.Failed > 0 && oldJob.Status.Failed == 0 {
 				log.Debug("Job failed", zap.String("job", newJob.Name), zap.String("namespace", newJob.Namespace))
 				metadata.JobsFailedTotal.Inc()
+			}
+			if updateFunc != nil {
+				updateFunc(oldJob, newJob)
 			}
 		},
 		DeleteFunc: func(obj interface{}) {

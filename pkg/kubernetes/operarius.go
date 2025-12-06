@@ -3,6 +3,8 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -11,7 +13,9 @@ import (
 	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
@@ -20,12 +24,13 @@ import (
 
 // OperariusClient represents a client for Operarius CRDs
 type OperariusClient struct {
-	client    ctrlclient.Client
-	namespace string
-	store     cache.Store
-	storeMu   sync.RWMutex
-	informer  cache.SharedIndexInformer
-	scheme    *runtime.Scheme
+	client     ctrlclient.Client
+	restClient rest.Interface
+	namespace  string
+	store      cache.Store
+	storeMu    sync.RWMutex
+	informer   cache.SharedIndexInformer
+	scheme     *runtime.Scheme
 }
 
 // NewOperariusClient creates a new client for Operarius CRDs
@@ -36,23 +41,41 @@ func NewOperariusClient(kubeconfig *string, namespace string) (*OperariusClient,
 	}
 
 	// Create scheme and register Operarius types
-	scheme := runtime.NewScheme()
-	if err := operariusv1alpha1.AddToScheme(scheme); err != nil {
+	sch := runtime.NewScheme()
+	if err := operariusv1alpha1.AddToScheme(sch); err != nil {
 		return nil, fmt.Errorf("failed to add Operarius to scheme: %w", err)
 	}
+	// Add standard k8s types to scheme (needed for REST client)
+	if err := scheme.AddToScheme(sch); err != nil {
+		return nil, fmt.Errorf("failed to add k8s types to scheme: %w", err)
+	}
+	// Register ListOptions for ParameterCodec
+	sch.AddKnownTypes(metav1.SchemeGroupVersion, &metav1.ListOptions{})
 
 	// Create controller-runtime client
 	client, err := ctrlclient.New(config, ctrlclient.Options{
-		Scheme: scheme,
+		Scheme: sch,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
+	// Create REST client for watching
+	config.ContentConfig.GroupVersion = &operariusv1alpha1.GroupVersion
+	config.APIPath = "/apis"
+	config.NegotiatedSerializer = serializer.NewCodecFactory(sch).WithoutConversion()
+	config.UserAgent = rest.DefaultKubernetesUserAgent()
+
+	restClient, err := rest.RESTClientFor(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create REST client: %w", err)
+	}
+
 	return &OperariusClient{
-		client:    client,
-		namespace: namespace,
-		scheme:    scheme,
+		client:     client,
+		restClient: restClient,
+		namespace:  namespace,
+		scheme:     sch,
 	}, nil
 }
 
@@ -62,8 +85,22 @@ func getRestConfig(kubeconfig *string) (*rest.Config, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		// Fallback to kubeconfig
-		if kubeconfig != nil && *kubeconfig != "" {
-			config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
+		kubeconfigPath := ""
+		if kubeconfig != nil {
+			kubeconfigPath = *kubeconfig
+		}
+
+		if kubeconfigPath == "" {
+			if home, err := os.UserHomeDir(); err == nil {
+				defaultPath := filepath.Join(home, ".kube", "config")
+				if _, err := os.Stat(defaultPath); err == nil {
+					kubeconfigPath = defaultPath
+				}
+			}
+		}
+
+		if kubeconfigPath != "" {
+			config, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath)
 			if err != nil {
 				return nil, err
 			}
@@ -85,23 +122,24 @@ func (c *OperariusClient) InitOperariusInformer(ctx context.Context, restConfig 
 		}
 	}
 
-	// Create list/watch functions using controller-runtime client
+	// Create list/watch functions using REST client
+	parameterCodec := runtime.NewParameterCodec(c.scheme)
 	listFunc := func(options metav1.ListOptions) (runtime.Object, error) {
-		list := &operariusv1alpha1.OperariusList{}
-		listOpts := []ctrlclient.ListOption{
-			ctrlclient.InNamespace(c.namespace),
-		}
-		if err := c.client.List(ctx, list, listOpts...); err != nil {
-			return nil, err
-		}
-		return list, nil
+		return c.restClient.Get().
+			Namespace(c.namespace).
+			Resource("operariuses").
+			SpecificallyVersionedParams(&options, parameterCodec, metav1.SchemeGroupVersion).
+			Do(ctx).
+			Get()
 	}
 
 	watchFunc := func(options metav1.ListOptions) (watch.Interface, error) {
-		// Watch not implemented - using resync for cache updates
-		// Note: The GetOperariiForNamespace function reads directly from API
-		// to ensure newly created Operarii are immediately available
-		return nil, fmt.Errorf("watch not implemented - using resync")
+		options.Watch = true
+		return c.restClient.Get().
+			Namespace(c.namespace).
+			Resource("operariuses").
+			SpecificallyVersionedParams(&options, parameterCodec, metav1.SchemeGroupVersion).
+			Watch(ctx)
 	}
 
 	// Create informer with list (watch uses resync)
@@ -129,11 +167,16 @@ func (c *OperariusClient) InitOperariusInformer(ctx context.Context, restConfig 
 			}
 		},
 		UpdateFunc: func(old, new interface{}) {
-			operarius, ok := new.(*operariusv1alpha1.Operarius)
-			if ok {
+			oldOp, oldOk := old.(*operariusv1alpha1.Operarius)
+			newOp, newOk := new.(*operariusv1alpha1.Operarius)
+			if oldOk && newOk {
+				// Skip logging if ResourceVersion hasn't changed (periodic resync)
+				if oldOp.ResourceVersion == newOp.ResourceVersion {
+					return
+				}
 				log.Debug("Operarius updated in store",
-					zap.String("name", operarius.Name),
-					zap.String("namespace", operarius.Namespace))
+					zap.String("name", newOp.Name),
+					zap.String("namespace", newOp.Namespace))
 			}
 		},
 		DeleteFunc: func(obj interface{}) {

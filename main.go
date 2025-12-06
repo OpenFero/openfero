@@ -20,6 +20,7 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 	"go.uber.org/zap"
 
+	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/OpenFero/openfero/pkg/alertstore"
@@ -94,14 +95,11 @@ func main() {
 	addr := flag.String("addr", ":8080", "address to listen for webhook")
 	logLevel := flag.String("logLevel", "info", "log level")
 	kubeconfig := flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-	configmapNamespace := flag.String("configmapNamespace", "", "Kubernetes namespace where jobs are defined")
-	jobDestinationNamespace := flag.String("jobDestinationNamespace", "", "Kubernetes namespace where jobs will be created")
 	readTimeout := flag.Int("readTimeout", 5, "read timeout in seconds")
 	writeTimeout := flag.Int("writeTimeout", 10, "write timeout in seconds")
 	alertStoreSize := flag.Int("alertStoreSize", 10, "size of the alert store")
 	alertStoreType := flag.String("alertStoreType", "memory", "type of alert store (memory, memberlist)")
 	alertStoreClusterName := flag.String("alertStoreClusterName", "openfero", "Cluster name for memberlist alert store")
-	labelSelector := flag.String("labelSelector", "app=openfero", "label selector for OpenFero ConfigMaps in the format key=value")
 
 	// Authentication flags
 	authMethod := flag.String("authMethod", "none", "authentication method for webhook endpoint (none, basic, bearer, oauth2)")
@@ -112,8 +110,7 @@ func main() {
 	authOAuth2Audience := flag.String("authOAuth2Audience", "", "OAuth2 token audience")
 
 	// Operarius CRD flags
-	useOperariusCRDs := flag.Bool("useOperariusCRDs", false, "use Operarius CRDs instead of ConfigMaps for remediation jobs")
-	operariusNamespace := flag.String("operariusNamespace", "", "Kubernetes namespace to watch for Operarius CRDs (defaults to configmapNamespace)")
+	operariusNamespace := flag.String("operariusNamespace", "", "Kubernetes namespace to watch for Operarius CRDs")
 
 	flag.Parse()
 
@@ -152,39 +149,14 @@ func main() {
 		log.Fatal("Current kubernetes namespace could not be found", zap.String("error", err.Error()))
 	}
 
-	if *configmapNamespace == "" {
-		configmapNamespace = &currentNamespace
-	}
-
-	if *jobDestinationNamespace == "" {
-		jobDestinationNamespace = &currentNamespace
-	}
-
-	// Set operarius namespace to configmap namespace if not specified
+	// Set operarius namespace to current namespace if not specified
 	if *operariusNamespace == "" {
-		operariusNamespace = configmapNamespace
+		operariusNamespace = &currentNamespace
 	}
-
-	// Parse label selector
-	parsedLabelSelector, err := metav1.ParseToLabelSelector(*labelSelector)
-	if err != nil {
-		log.Fatal("Could not parse label selector", zap.String("error", err.Error()))
-	}
-
-	log.Debug("Using label selector: " + metav1.FormatLabelSelector(parsedLabelSelector))
-
-	// Create informer factories
-	configMapInformer := kubernetes.InitConfigMapInformer(clientset, *configmapNamespace, parsedLabelSelector)
-	jobInformer := kubernetes.InitJobInformer(clientset, *jobDestinationNamespace, parsedLabelSelector)
 
 	// Initialize Kubernetes client
 	kubeClient := &kubernetes.Client{
-		Clientset:               *clientset,
-		JobDestinationNamespace: *jobDestinationNamespace,
-		ConfigmapNamespace:      *configmapNamespace,
-		ConfigMapStore:          configMapInformer,
-		JobStore:                jobInformer,
-		LabelSelector:           parsedLabelSelector,
+		Clientset: *clientset,
 	}
 
 	// Validate and create authentication configuration
@@ -217,33 +189,64 @@ func main() {
 		AuthConfig: authConfig,
 	}
 
-	// Initialize Operarius CRD support if enabled
-	if *useOperariusCRDs {
-		log.Info("Operarius CRD mode enabled",
-			zap.String("namespace", *operariusNamespace))
+	// Initialize Operarius CRD support
+	log.Info("Initializing Operarius CRD support",
+		zap.String("namespace", *operariusNamespace))
 
-		operariusClient, err := kubernetes.NewOperariusClient(kubeconfig, *operariusNamespace)
-		if err != nil {
-			log.Fatal("Failed to create Operarius client", zap.Error(err))
-		}
-
-		// Initialize informer and wait for cache sync
-		ctx := context.Background()
-		_, err = operariusClient.InitOperariusInformer(ctx, nil, kubeconfig)
-		if err != nil {
-			log.Warn("Failed to initialize Operarius informer, falling back to API calls",
-				zap.Error(err))
-		}
-
-		// Create OperariusService and wire it up
-		operariusService := services.NewOperariusServiceWithK8sClient(&kubeClient.Clientset, operariusClient)
-		server.OperariusService = operariusService
-		server.UseOperariusCRDs = true
-
-		log.Info("Operarius CRD support initialized successfully")
-	} else {
-		log.Info("Using ConfigMap-based remediation jobs (legacy mode)")
+	operariusClient, err := kubernetes.NewOperariusClient(kubeconfig, *operariusNamespace)
+	if err != nil {
+		log.Fatal("Failed to create Operarius client", zap.Error(err))
 	}
+
+	// Initialize informer and wait for cache sync
+	ctx := context.Background()
+	_, err = operariusClient.InitOperariusInformer(ctx, nil, kubeconfig)
+	if err != nil {
+		log.Warn("Failed to initialize Operarius informer, falling back to API calls",
+			zap.Error(err))
+	}
+
+	// Create OperariusService and wire it up
+	operariusService := services.NewOperariusServiceWithK8sClient(&kubeClient.Clientset, operariusClient)
+	server.OperariusService = operariusService
+
+	log.Info("Operarius CRD support initialized successfully")
+
+	// Determine job label selector
+	// In Operarius mode, we watch for jobs managed by OpenFero (labeled with openfero.io/managed-by=openfero)
+	jobSelector := &metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			"openfero.io/managed-by": "openfero",
+		},
+	}
+	log.Info("Using Operarius job selector", zap.String("selector", metav1.FormatLabelSelector(jobSelector)))
+
+	// Initialize Job informer with update callback
+	// We watch jobs in the same namespace as Operarius CRDs
+	kubernetes.InitJobInformer(clientset, *operariusNamespace, jobSelector, func(oldJob, newJob *batchv1.Job) {
+		if operariusService != nil && newJob != nil {
+			// Check if job is managed by OpenFero
+			if operariusName, ok := newJob.Labels["openfero.io/operarius"]; ok {
+				ctx := context.Background()
+				// Find the Operarius
+				operarius, err := operariusService.GetOperarius(ctx, operariusName, newJob.Namespace)
+				if err != nil {
+					log.Error("Failed to get Operarius for job update",
+						zap.String("operarius", operariusName),
+						zap.Error(err))
+					return
+				}
+
+				// Update status based on job status
+				if err := operariusService.UpdateOperariusStatusFromJob(ctx, operarius, newJob); err != nil {
+					log.Error("Failed to update Operarius status from job",
+						zap.String("operarius", operariusName),
+						zap.String("job", newJob.Name),
+						zap.Error(err))
+				}
+			}
+		}
+	})
 
 	// Pass build information to handlers
 	handlers.SetBuildInfo(version, commit, date)
