@@ -1,5 +1,5 @@
-import { apiGet } from './client'
 import type { AlertStoreEntry, JobInfo } from '@/types'
+import { apiGet } from './client'
 
 /**
  * Fetch alerts from the API

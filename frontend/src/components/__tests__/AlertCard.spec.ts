@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
-import AlertCard from '../AlertCard.vue'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AlertStoreEntry } from '@/types'
+import AlertCard from '../AlertCard.vue'
 
 // Mock useDateTime composable
 vi.mock('@/composables/useDateTime', () => ({

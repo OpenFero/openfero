@@ -2,8 +2,8 @@
 import type { JobInfo } from '@/types'
 
 defineProps<{
-    jobs: JobInfo[]
-    loading?: boolean
+  jobs: JobInfo[]
+  loading?: boolean
 }>()
 </script>
 

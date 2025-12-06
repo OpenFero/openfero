@@ -2,8 +2,8 @@
 import { onMounted } from 'vue'
 import { RouterView } from 'vue-router'
 import { NavBar } from '@/components'
-import { useAppStore } from '@/stores'
 import { useTheme } from '@/composables'
+import { useAppStore } from '@/stores'
 
 // Initialize theme
 useTheme()

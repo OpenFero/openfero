@@ -1,5 +1,5 @@
-import { apiGet } from './client'
 import type { BuildInfo } from '@/types'
+import { apiGet } from './client'
 
 /**
  * Fetch application build info

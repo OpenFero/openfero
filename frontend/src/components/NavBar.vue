@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useTheme } from '@/composables/useTheme'
 import { useAppStore } from '@/stores/app'
 
 defineProps<{
-    showSearch?: boolean
+  showSearch?: boolean
 }>()
 
 const emit = defineEmits<{
-    search: [query: string]
+  search: [query: string]
 }>()
 
 const route = useRoute()
@@ -21,30 +21,30 @@ const showAboutModal = ref(false)
 const mobileMenuOpen = ref(false)
 
 function handleSearch(event: Event) {
-    const target = event.target as HTMLInputElement
-    emit('search', target.value)
+  const target = event.target as HTMLInputElement
+  emit('search', target.value)
 }
 
 function openAboutModal() {
-    showAboutModal.value = true
-    if (!appStore.buildInfo) {
-        appStore.fetchInfo()
-    }
+  showAboutModal.value = true
+  if (!appStore.buildInfo) {
+    appStore.fetchInfo()
+  }
 }
 
 function closeAboutModal() {
-    showAboutModal.value = false
+  showAboutModal.value = false
 }
 
 // Close modal on escape key
 function handleEscape(event: KeyboardEvent) {
-    if (event.key === 'Escape' && showAboutModal.value) {
-        closeAboutModal()
-    }
+  if (event.key === 'Escape' && showAboutModal.value) {
+    closeAboutModal()
+  }
 }
 
 onMounted(() => {
-    document.addEventListener('keydown', handleEscape)
+  document.addEventListener('keydown', handleEscape)
 })
 </script>
 
