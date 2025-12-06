@@ -2,9 +2,22 @@
 import type { JobInfo } from '@/types'
 
 defineProps<{
-  jobs: JobInfo[]
-  loading?: boolean
+    jobs: JobInfo[]
+    loading?: boolean
 }>()
+
+const formatDate = (dateString?: string) => {
+    if (!dateString) return '-'
+    return new Date(dateString).toLocaleString()
+}
+
+const getConditionColor = (type: string, status: string) => {
+    if (type === 'Successful' && status === 'True') return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+    if (type === 'Failed' && status === 'True') return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+    if (type === 'Executing' && status === 'True') return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
+    if (type === 'Pending') return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+    return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+}
 </script>
 
 <template>
@@ -28,6 +41,9 @@ defineProps<{
                             <th scope="col" class="px-4 py-3">Source / Operarius</th>
                             <th scope="col" class="px-4 py-3">Target Alert / Job</th>
                             <th scope="col" class="px-4 py-3">Container Image</th>
+                            <th scope="col" class="px-4 py-3">Executions</th>
+                            <th scope="col" class="px-4 py-3">Last Execution</th>
+                            <th scope="col" class="px-4 py-3">Status</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
@@ -38,6 +54,26 @@ defineProps<{
                             <td class="px-4 py-3">
                                 <code
                                     class="text-sm font-mono bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded">{{ job.image }}</code>
+                            </td>
+                            <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ job.executionCount || 0 }}</td>
+                            <td class="px-4 py-3 text-gray-600 dark:text-gray-400">
+                                <div v-if="job.lastExecutionTime">
+                                    {{ formatDate(job.lastExecutionTime) }}
+                                    <div v-if="job.lastExecutedJobName" class="text-xs text-gray-400 mt-1">
+                                        {{ job.lastExecutedJobName }}
+                                    </div>
+                                </div>
+                                <span v-else>-</span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <div v-if="job.conditions && job.conditions.length > 0" class="flex flex-wrap gap-1">
+                                    <span v-for="condition in job.conditions" :key="condition.type"
+                                        :class="['px-2 py-0.5 rounded text-xs font-medium', getConditionColor(condition.type, condition.status)]"
+                                        :title="condition.message">
+                                        {{ condition.type }}
+                                    </span>
+                                </div>
+                                <span v-else class="text-gray-400">-</span>
                             </td>
                         </tr>
                     </tbody>

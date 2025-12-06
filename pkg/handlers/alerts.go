@@ -26,8 +26,7 @@ type Server struct {
 	KubeClient       *kubernetes.Client
 	AlertStore       alertstore.Store
 	AuthConfig       AuthConfig
-	OperariusService *services.OperariusService // New: Service for Operarius CRDs
-	UseOperariusCRDs bool                       // New: Flag to enable CRD-based jobs
+	OperariusService *services.OperariusService // Service for Operarius CRDs
 }
 
 // AlertsGetHandler handles GET requests to /alerts
@@ -73,22 +72,11 @@ func (s *Server) AlertsPostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Choose between CRD-based or ConfigMap-based job creation
-	if s.UseOperariusCRDs && s.OperariusService != nil {
-		// New CRD-based approach
+	if s.OperariusService != nil {
 		s.handleOperariusBasedJobs(r.Context(), message)
 	} else {
-		// Legacy ConfigMap-based approach - DEPRECATED in v0.17.0, will be removed in v0.18.0
-		log.Warn("DEPRECATION: ConfigMap-based remediation is deprecated and will be removed in v0.18.0. Please migrate to Operarius CRDs. See docs/operarius-crd-migration.md for migration guide.",
-			zap.String("alertname", message.CommonLabels["alertname"]),
-			zap.String("groupKey", message.GroupKey))
-		log.Debug("Creating response jobs (legacy mode)",
-			zap.Int("jobCount", alertcount),
-			zap.String("groupKey", message.GroupKey))
-
-		for _, alert := range message.Alerts {
-			go services.CreateResponseJob(s.KubeClient, s.AlertStore, alert, status, message.GroupKey)
-		}
+		log.Error("OperariusService is not initialized")
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
 
@@ -191,7 +179,7 @@ func (s *Server) AlertStoreGetHandler(w http.ResponseWriter, r *http.Request) {
 	alerts, err := s.AlertStore.GetAlerts(query, limit)
 	if err != nil {
 		log.Error("Error retrieving alerts", zap.Error(err))
-		http.Error(w, "", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 

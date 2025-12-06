@@ -15,8 +15,20 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 
 	operariusv1alpha1 "github.com/OpenFero/openfero/api/v1alpha1"
+	log "github.com/OpenFero/openfero/pkg/logging"
 	"github.com/OpenFero/openfero/pkg/models"
+	"github.com/OpenFero/openfero/pkg/utils"
+	"go.uber.org/zap"
 )
+
+func init() {
+	// Initialize logger for tests
+	cfg := zap.NewDevelopmentConfig()
+	err := log.SetConfig(cfg)
+	if err != nil {
+		panic(err)
+	}
+}
 
 // Verify MockOperariusClient implements OperariusClientInterface
 var _ OperariusClientInterface = (*MockOperariusClient)(nil)
@@ -49,6 +61,15 @@ func (m *MockOperariusClient) UpdateStatus(ctx context.Context, operarius *opera
 		return m.updateStatusFn(ctx, operarius)
 	}
 	return nil
+}
+
+func (m *MockOperariusClient) Get(name string) (*operariusv1alpha1.Operarius, error) {
+	for _, op := range m.operarii {
+		if op.Name == name {
+			return &op, nil
+		}
+	}
+	return nil, errors.New("not found")
 }
 
 func (m *MockOperariusClient) GetNamespace() string {
@@ -264,7 +285,7 @@ func TestOperariusService_CreateJobFromOperarius(t *testing.T) {
 	assert.Equal(t, "openfero", job.Namespace)
 	assert.Equal(t, "test-operarius", job.Labels["openfero.io/operarius"])
 	assert.Equal(t, "TestAlert", job.Labels["openfero.io/alert"])
-	assert.Equal(t, "test-group", job.Labels["openfero.io/group-key"])
+	assert.Equal(t, utils.HashGroupKey("test-group"), job.Labels["openfero.io/group-key"])
 	assert.Equal(t, "openfero", job.Labels["app"])
 
 	// Check template variables were applied
@@ -311,7 +332,7 @@ func TestOperariusService_CheckDeduplication(t *testing.T) {
 			Namespace: "openfero",
 			Labels: map[string]string{
 				"openfero.io/operarius": "test-operarius",
-				"openfero.io/group-key": "test-group",
+				"openfero.io/group-key": utils.HashGroupKey("test-group"),
 			},
 			CreationTimestamp: metav1.NewTime(time.Now().Add(-2 * time.Minute)), // 2 minutes ago
 		},
@@ -331,7 +352,7 @@ func TestOperariusService_CheckDeduplication(t *testing.T) {
 			Namespace: "openfero",
 			Labels: map[string]string{
 				"openfero.io/operarius": "test-operarius",
-				"openfero.io/group-key": "test-group",
+				"openfero.io/group-key": utils.HashGroupKey("test-group"),
 			},
 			CreationTimestamp: metav1.NewTime(time.Now().Add(-10 * time.Minute)), // 10 minutes ago
 		},
@@ -1259,7 +1280,7 @@ func TestUpdateOperariusStatus(t *testing.T) {
 
 					if tt.expectCondition {
 						assert.Len(t, testOperarius.Status.Conditions, 1)
-						assert.Equal(t, operariusv1alpha1.OperariusConditionReady, testOperarius.Status.Conditions[0].Type)
+						assert.Equal(t, operariusv1alpha1.OperariusConditionPending, testOperarius.Status.Conditions[0].Type)
 						assert.Equal(t, metav1.ConditionTrue, testOperarius.Status.Conditions[0].Status)
 					}
 				}
@@ -1283,7 +1304,7 @@ func TestUpdateConditions(t *testing.T) {
 			name:              "adds new condition to empty list",
 			existingCondition: nil,
 			newCondition: operariusv1alpha1.OperariusCondition{
-				Type:               operariusv1alpha1.OperariusConditionReady,
+				Type:               operariusv1alpha1.OperariusConditionSuccessful,
 				Status:             metav1.ConditionTrue,
 				LastTransitionTime: now,
 				Reason:             "JobCreated",
@@ -1296,7 +1317,7 @@ func TestUpdateConditions(t *testing.T) {
 			name: "updates existing condition",
 			existingCondition: []operariusv1alpha1.OperariusCondition{
 				{
-					Type:               operariusv1alpha1.OperariusConditionReady,
+					Type:               operariusv1alpha1.OperariusConditionSuccessful,
 					Status:             metav1.ConditionFalse,
 					LastTransitionTime: now,
 					Reason:             "Error",
@@ -1304,7 +1325,7 @@ func TestUpdateConditions(t *testing.T) {
 				},
 			},
 			newCondition: operariusv1alpha1.OperariusCondition{
-				Type:               operariusv1alpha1.OperariusConditionReady,
+				Type:               operariusv1alpha1.OperariusConditionSuccessful,
 				Status:             metav1.ConditionTrue,
 				LastTransitionTime: now,
 				Reason:             "JobCreated",
@@ -1317,7 +1338,7 @@ func TestUpdateConditions(t *testing.T) {
 			name: "adds new condition type to existing conditions",
 			existingCondition: []operariusv1alpha1.OperariusCondition{
 				{
-					Type:               operariusv1alpha1.OperariusConditionReady,
+					Type:               operariusv1alpha1.OperariusConditionSuccessful,
 					Status:             metav1.ConditionTrue,
 					LastTransitionTime: now,
 					Reason:             "JobCreated",
@@ -1624,7 +1645,7 @@ func TestCheckDeduplication_DefaultTTL(t *testing.T) {
 			Namespace: "openfero",
 			Labels: map[string]string{
 				"openfero.io/operarius": "test-operarius",
-				"openfero.io/group-key": "test-group",
+				"openfero.io/group-key": utils.HashGroupKey("test-group"),
 			},
 			CreationTimestamp: metav1.NewTime(time.Now().Add(-4 * time.Minute)),
 		},

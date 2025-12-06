@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { JobTable } from '@/components'
 import { useJobsStore } from '@/stores'
 
 const jobsStore = useJobsStore()
+const showLegend = ref(false)
 
 onMounted(() => {
-  jobsStore.fetch()
+    jobsStore.fetch()
 })
 </script>
 
@@ -21,14 +22,58 @@ onMounted(() => {
                 </svg>
                 Configured Remediation Rules
             </h4>
-            <button class="btn btn-secondary btn-sm" :disabled="jobsStore.isLoading" @click="jobsStore.fetch()">
-                <svg class="w-4 h-4 mr-1 inline" :class="{ 'animate-spin': jobsStore.isLoading }" fill="none"
-                    stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                Refresh
-            </button>
+            <div class="flex gap-2">
+                <button
+                    class="btn btn-sm bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                    @click="showLegend = !showLegend">
+                    <svg class="w-4 h-4 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Legend
+                </button>
+                <button class="btn btn-secondary btn-sm" :disabled="jobsStore.isLoading" @click="jobsStore.fetch()">
+                    <svg class="w-4 h-4 mr-1 inline" :class="{ 'animate-spin': jobsStore.isLoading }" fill="none"
+                        stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Refresh
+                </button>
+            </div>
+        </div>
+
+        <!-- Legend Modal/Panel -->
+        <div v-if="showLegend"
+            class="mb-4 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+            <h5 class="font-semibold text-gray-900 dark:text-white mb-2">Status Legend</h5>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                <div class="flex items-start gap-2">
+                    <span
+                        class="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 mt-0.5">Successful</span>
+                    <span class="text-gray-600 dark:text-gray-400">Last job creation was successful.</span>
+                </div>
+                <div class="flex items-start gap-2">
+                    <span
+                        class="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 mt-0.5">Executing</span>
+                    <span class="text-gray-600 dark:text-gray-400">A remediation job is currently being
+                        processed.</span>
+                </div>
+                <div class="flex items-start gap-2">
+                    <span
+                        class="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300 mt-0.5">Pending</span>
+                    <span class="text-gray-600 dark:text-gray-400">Job is created but waiting to be scheduled.</span>
+                </div>
+                <div class="flex items-start gap-2">
+                    <span
+                        class="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300 mt-0.5">Failed</span>
+                    <span class="text-gray-600 dark:text-gray-400">Last job creation failed. Check logs for
+                        details.</span>
+                </div>
+            </div>
+            <p class="mt-3 text-xs text-gray-500 dark:text-gray-500 italic">
+                Tip: Hover over a status badge in the table to see detailed status messages.
+            </p>
         </div>
 
         <!-- Backend unavailable state -->
@@ -58,7 +103,7 @@ onMounted(() => {
             class="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400"
             role="alert">
             <div class="flex items-center gap-2">
-                <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <svg class="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fill-rule="evenodd"
                         d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
                         clip-rule="evenodd" />

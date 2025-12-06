@@ -77,8 +77,10 @@ type OperariusSpec struct {
 type OperariusConditionType string
 
 const (
-	// OperariusConditionReady indicates the Operarius is ready to execute
-	OperariusConditionReady OperariusConditionType = "Ready"
+	// OperariusConditionSuccessful indicates the last execution was successful
+	OperariusConditionSuccessful OperariusConditionType = "Successful"
+	// OperariusConditionPending indicates the Operarius has a job created but not yet running
+	OperariusConditionPending OperariusConditionType = "Pending"
 	// OperariusConditionExecuting indicates the Operarius is currently executing
 	OperariusConditionExecuting OperariusConditionType = "Executing"
 	// OperariusConditionFailed indicates the last execution failed
