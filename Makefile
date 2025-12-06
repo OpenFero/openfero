@@ -54,7 +54,7 @@ dev: ## Run local development environment (backend with air, frontend with vite)
 	@echo "Starting local development environment..."
 	@echo "Backend will run on http://localhost:8080"
 	@echo "Frontend will run on http://localhost:5173"
-	@trap 'kill %1' SIGINT; \
+	@trap 'kill %1' INT; \
 	$(HOME)/go/bin/air & \
 	cd frontend && npm run dev
 
