@@ -70,7 +70,8 @@ jobs:
 
       - name: Set GORELEASER_PREVIOUS_TAG in actual release
         run: |
-          prev_tag=$(git tag -l | sed 's/^v//' | sort -V | grep -Ev "(nightly|latest)" | tail -n 1)
+          current_tag="${GITHUB_REF_NAME#refs/tags/}"
+          prev_tag=$(git tag -l | grep -v "^$current_tag$" | sed 's/^v//' | sort -V | grep -Ev "(nightly|latest)" | tail -n 1)
           echo "GORELEASER_PREVIOUS_TAG=$prev_tag" >> "$GITHUB_ENV"
 
       - name: Create tag (only for workflow_dispatch)
@@ -184,18 +185,6 @@ jobs:
             helm push "${pkg}" "oci://ghcr.io/openfero/openfero/charts"
           done
 
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@84ae59a2cdc2258d6fa0732dd66352dddae2a412 # v7.0.9
-        with:
-          commit-message: Bump chart version to ${{ env.NEW_VERSION }}
-          title: Bump chart version to ${{ env.NEW_VERSION }}
-          body: |
-            Updates the Helm chart version for release ${{ github.event.inputs.tag }}
-          branch: bump-chart-${{ env.NEW_VERSION }}
-          base: ${{ github.ref_name }}
-          add-paths: charts/openfero/Chart.yaml
-          delete-branch: true
-
       - name: Upload signatures to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -219,3 +208,15 @@ jobs:
           done
 
           echo "Signature files uploaded to release"
+
+      - name: Create Pull Request to bump chart version
+        uses: peter-evans/create-pull-request@84ae59a2cdc2258d6fa0732dd66352dddae2a412 # v7.0.9
+        with:
+          commit-message: Bump chart version to ${{ env.NEW_VERSION }}
+          title: Bump chart version to ${{ env.NEW_VERSION }}
+          body: |
+            Updates the Helm chart version for release ${{ github.event.inputs.tag }}
+          branch: bump-chart-${{ env.NEW_VERSION }}
+          base: main
+          add-paths: charts/openfero/Chart.yaml
+          delete-branch: true
