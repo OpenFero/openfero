@@ -73,47 +73,8 @@ type OperariusSpec struct {
 	Deduplication *DeduplicationConfig `json:"deduplication,omitempty"`
 }
 
-// OperariusConditionType represents the type of condition
-type OperariusConditionType string
-
-const (
-	// OperariusConditionSuccessful indicates the last execution was successful
-	OperariusConditionSuccessful OperariusConditionType = "Successful"
-	// OperariusConditionPending indicates the Operarius has a job created but not yet running
-	OperariusConditionPending OperariusConditionType = "Pending"
-	// OperariusConditionExecuting indicates the Operarius is currently executing
-	OperariusConditionExecuting OperariusConditionType = "Executing"
-	// OperariusConditionFailed indicates the last execution failed
-	OperariusConditionFailed OperariusConditionType = "Failed"
-)
-
-// OperariusCondition represents a condition of an Operarius
-type OperariusCondition struct {
-	// Type of Operarius condition
-	Type OperariusConditionType `json:"type"`
-
-	// Status of the condition, one of True, False, Unknown
-	Status metav1.ConditionStatus `json:"status"`
-
-	// Last time the condition transitioned from one status to another
-	// +optional
-	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
-
-	// Unique, one-word, CamelCase reason for the condition's last transition
-	// +optional
-	Reason string `json:"reason,omitempty"`
-
-	// Human-readable message indicating details about last transition
-	// +optional
-	Message string `json:"message,omitempty"`
-}
-
 // OperariusStatus defines the observed state of Operarius
 type OperariusStatus struct {
-	// Conditions represent the latest available observations of an Operarius's state
-	// +optional
-	Conditions []OperariusCondition `json:"conditions,omitempty"`
-
 	// LastExecutionTime represents the last time a job was created from this Operarius
 	// +optional
 	LastExecutionTime *metav1.Time `json:"lastExecutionTime,omitempty"`

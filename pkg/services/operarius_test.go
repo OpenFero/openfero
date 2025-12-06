@@ -1217,7 +1217,6 @@ func TestUpdateOperariusStatus(t *testing.T) {
 		jobName         string
 		expectError     bool
 		expectedCount   int32
-		expectCondition bool
 	}{
 		{
 			name:          "no client configured skips update",
@@ -1238,7 +1237,6 @@ func TestUpdateOperariusStatus(t *testing.T) {
 			jobName:         "test-job-123",
 			expectError:     false,
 			expectedCount:   6,
-			expectCondition: true,
 		},
 		{
 			name: "update error is propagated",
@@ -1277,108 +1275,12 @@ func TestUpdateOperariusStatus(t *testing.T) {
 					assert.Equal(t, tt.expectedCount, testOperarius.Status.ExecutionCount)
 					assert.Equal(t, tt.jobName, testOperarius.Status.LastExecutedJobName)
 					assert.NotNil(t, testOperarius.Status.LastExecutionTime)
-
-					if tt.expectCondition {
-						assert.Len(t, testOperarius.Status.Conditions, 1)
-						assert.Equal(t, operariusv1alpha1.OperariusConditionPending, testOperarius.Status.Conditions[0].Type)
-						assert.Equal(t, metav1.ConditionTrue, testOperarius.Status.Conditions[0].Status)
-					}
 				}
 			}
 		})
 	}
 }
 
-// TestUpdateConditions tests the updateConditions helper function
-func TestUpdateConditions(t *testing.T) {
-	now := metav1.Now()
-
-	tests := []struct {
-		name              string
-		existingCondition []operariusv1alpha1.OperariusCondition
-		newCondition      operariusv1alpha1.OperariusCondition
-		expectedLen       int
-		expectedStatus    metav1.ConditionStatus
-	}{
-		{
-			name:              "adds new condition to empty list",
-			existingCondition: nil,
-			newCondition: operariusv1alpha1.OperariusCondition{
-				Type:               operariusv1alpha1.OperariusConditionSuccessful,
-				Status:             metav1.ConditionTrue,
-				LastTransitionTime: now,
-				Reason:             "JobCreated",
-				Message:            "Job created successfully",
-			},
-			expectedLen:    1,
-			expectedStatus: metav1.ConditionTrue,
-		},
-		{
-			name: "updates existing condition",
-			existingCondition: []operariusv1alpha1.OperariusCondition{
-				{
-					Type:               operariusv1alpha1.OperariusConditionSuccessful,
-					Status:             metav1.ConditionFalse,
-					LastTransitionTime: now,
-					Reason:             "Error",
-					Message:            "Previous error",
-				},
-			},
-			newCondition: operariusv1alpha1.OperariusCondition{
-				Type:               operariusv1alpha1.OperariusConditionSuccessful,
-				Status:             metav1.ConditionTrue,
-				LastTransitionTime: now,
-				Reason:             "JobCreated",
-				Message:            "Job created successfully",
-			},
-			expectedLen:    1,
-			expectedStatus: metav1.ConditionTrue,
-		},
-		{
-			name: "adds new condition type to existing conditions",
-			existingCondition: []operariusv1alpha1.OperariusCondition{
-				{
-					Type:               operariusv1alpha1.OperariusConditionSuccessful,
-					Status:             metav1.ConditionTrue,
-					LastTransitionTime: now,
-					Reason:             "JobCreated",
-					Message:            "Job created",
-				},
-			},
-			newCondition: operariusv1alpha1.OperariusCondition{
-				Type:               "Processing",
-				Status:             metav1.ConditionTrue,
-				LastTransitionTime: now,
-				Reason:             "Processing",
-				Message:            "Processing alert",
-			},
-			expectedLen:    2,
-			expectedStatus: metav1.ConditionTrue,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := updateConditions(tt.existingCondition, tt.newCondition)
-
-			assert.Len(t, result, tt.expectedLen)
-
-			// Find the condition we just added/updated
-			var foundCondition *operariusv1alpha1.OperariusCondition
-			for i := range result {
-				if result[i].Type == tt.newCondition.Type {
-					foundCondition = &result[i]
-					break
-				}
-			}
-
-			require.NotNil(t, foundCondition, "Expected condition not found")
-			assert.Equal(t, tt.expectedStatus, foundCondition.Status)
-			assert.Equal(t, tt.newCondition.Reason, foundCondition.Reason)
-			assert.Equal(t, tt.newCondition.Message, foundCondition.Message)
-		})
-	}
-}
 
 // TestApplyTemplateVariables_Args tests template processing in container args
 func TestApplyTemplateVariables_Args(t *testing.T) {

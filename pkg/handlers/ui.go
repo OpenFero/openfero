@@ -193,17 +193,6 @@ func (s *Server) JobsAPIHandler(w http.ResponseWriter, r *http.Request) {
 					image = op.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
 				}
 
-				var conditions []models.JobCondition
-				for _, c := range op.Status.Conditions {
-					conditions = append(conditions, models.JobCondition{
-						Type:               string(c.Type),
-						Status:             string(c.Status),
-						LastTransitionTime: c.LastTransitionTime.Time,
-						Reason:             c.Reason,
-						Message:            c.Message,
-					})
-				}
-
 				var lastExecutionTime *time.Time
 				if op.Status.LastExecutionTime != nil {
 					t := op.Status.LastExecutionTime.Time
@@ -217,7 +206,6 @@ func (s *Server) JobsAPIHandler(w http.ResponseWriter, r *http.Request) {
 					ExecutionCount:      op.Status.ExecutionCount,
 					LastExecutionTime:   lastExecutionTime,
 					LastExecutedJobName: op.Status.LastExecutedJobName,
-					Conditions:          conditions,
 				})
 			}
 		}
