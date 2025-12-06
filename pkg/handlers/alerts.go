@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/OpenFero/openfero/pkg/alertstore"
@@ -116,6 +117,23 @@ func (s *Server) handleOperariusBasedJobs(ctx context.Context, hookMessage model
 				log.Info("Skipping job creation due to deduplication",
 					zap.String("operarius", operarius.Name),
 					zap.String("groupKey", hookMessage.GroupKey))
+
+				var lastExecutionTime *time.Time
+				if operarius.Status.LastExecutionTime != nil {
+					t := operarius.Status.LastExecutionTime.Time
+					lastExecutionTime = &t
+				}
+
+				jobInfo = &alertstore.JobInfo{
+					JobName:             "N/A (Deduplicated)",
+					Namespace:           operarius.Namespace,
+					ConfigMapName:       operarius.Name,
+					Image:               "N/A",
+					ExecutionCount:      operarius.Status.ExecutionCount,
+					LastExecutionTime:   lastExecutionTime,
+					LastExecutedJobName: operarius.Status.LastExecutedJobName,
+					LastExecutionStatus: "Skipped: Deduplication",
+				}
 			} else {
 				// Create the job
 				job, err := s.OperariusService.CreateJobFromOperarius(ctx, operarius, hookMessage)
@@ -200,6 +218,11 @@ func (s *Server) AlertStoreGetHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	for i := range alerts {
 		if alerts[i].JobInfo != nil && alerts[i].JobInfo.JobName != "" && alerts[i].JobInfo.Namespace != "" {
+			// Skip lookup if job was skipped or has invalid name (e.g. "N/A (Deduplicated)")
+			if strings.HasPrefix(alerts[i].JobInfo.LastExecutionStatus, "Skipped") || strings.Contains(alerts[i].JobInfo.JobName, " ") {
+				continue
+			}
+
 			job, err := s.KubeClient.Clientset.BatchV1().Jobs(alerts[i].JobInfo.Namespace).Get(ctx, alerts[i].JobInfo.JobName, metav1.GetOptions{})
 			if err == nil {
 				// Determine status
