@@ -64,8 +64,11 @@ jobs:
           VALIDATE_GO_MODULES: false # Go linting handled by go-tests.yml workflow
           VALIDATE_JSX: false
           VALIDATE_CSS: false
+          VALIDATE_CSS_PRETTIER: false
+          VALIDATE_JAVASCRIPT_PRETTIER: false
           VALIDATE_HTML: false
           VALIDATE_HTML_PRETTIER: false
+          VALIDATE_JSON_PRETTIER: false
           VALIDATE_MARKDOWN_PRETTIER: false
           # Disable TypeScript/Vue linting - handled by frontend-tests.yml workflow
           VALIDATE_TYPESCRIPT_ES: false
