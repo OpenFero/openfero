@@ -14,6 +14,7 @@ import (
 	log "github.com/OpenFero/openfero/pkg/logging"
 	"github.com/OpenFero/openfero/pkg/models"
 	"go.uber.org/zap"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // UIHandler handles GET requests to /
@@ -202,11 +203,36 @@ func (s *Server) JobsAPIHandler(w http.ResponseWriter, r *http.Request) {
 				jobInfos = append(jobInfos, models.JobInfo{
 					ConfigMapName:       op.Name,
 					JobName:             op.Spec.AlertSelector.AlertName, // Use AlertName as JobName for display
+					Namespace:           op.Namespace,
 					Image:               image,
 					ExecutionCount:      op.Status.ExecutionCount,
 					LastExecutionTime:   lastExecutionTime,
 					LastExecutedJobName: op.Status.LastExecutedJobName,
+					LastExecutionStatus: op.Status.LastExecutionStatus,
 				})
+			}
+		}
+	}
+
+	// Enrich with live status for active jobs
+	ctx := r.Context()
+	for i := range jobInfos {
+		// If we have a last executed job name, check its current status
+		if jobInfos[i].LastExecutedJobName != "" && jobInfos[i].Namespace != "" {
+			job, err := s.KubeClient.Clientset.BatchV1().Jobs(jobInfos[i].Namespace).Get(ctx, jobInfos[i].LastExecutedJobName, metav1.GetOptions{})
+			if err == nil {
+				// Determine status
+				status := "Pending"
+				if job.Status.Succeeded > 0 {
+					status = "Successful"
+				} else if job.Status.Failed > 0 {
+					status = "Failed"
+				} else if job.Status.Active > 0 {
+					status = "Running"
+				}
+				// Update status if it's different (e.g. Running vs Pending stored in CRD)
+				// Note: We don't persist "Running" to CRD to avoid churn, but we show it in UI
+				jobInfos[i].LastExecutionStatus = status
 			}
 		}
 	}

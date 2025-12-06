@@ -54,6 +54,8 @@ type JobInfo struct {
 	ConfigMapName string `json:"configMapName"`
 	// Name of the job
 	JobName string `json:"jobName"`
+	// Namespace of the job
+	Namespace string `json:"namespace,omitempty"`
 	// Container image used by the job
 	Image string `json:"image"`
 	// Total number of jobs created from this Operarius
@@ -62,6 +64,8 @@ type JobInfo struct {
 	LastExecutionTime *time.Time `json:"lastExecutionTime,omitempty"`
 	// Name of the last job created
 	LastExecutedJobName string `json:"lastExecutedJobName,omitempty"`
+	// Status of the last execution
+	LastExecutionStatus string `json:"status,omitempty"`
 }
 
 // ToAlertStoreAlert converts an Alert to alertstore.Alert

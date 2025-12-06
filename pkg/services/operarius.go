@@ -392,6 +392,7 @@ func (s *OperariusService) UpdateOperariusStatus(ctx context.Context, operarius 
 	operarius.Status.ExecutionCount++
 	operarius.Status.LastExecutionTime = &now
 	operarius.Status.LastExecutedJobName = jobName
+	operarius.Status.LastExecutionStatus = "Pending"
 
 	// Update via API
 	if err := s.operariusClient.UpdateStatus(ctx, operarius); err != nil {
@@ -402,6 +403,43 @@ func (s *OperariusService) UpdateOperariusStatus(ctx context.Context, operarius 
 		zap.String("operarius", operarius.Name),
 		zap.String("jobName", jobName),
 		zap.Int32("executionCount", operarius.Status.ExecutionCount))
+
+	return nil
+}
+
+// UpdateOperariusStatusFromJob updates the Operarius status based on the job status
+func (s *OperariusService) UpdateOperariusStatusFromJob(ctx context.Context, operarius *operariusv1alpha1.Operarius, job *batchv1.Job) error {
+	if s.operariusClient == nil {
+		return nil
+	}
+
+	// Only update for terminal states to avoid churn
+	var newStatus string
+	if job.Status.Succeeded > 0 {
+		newStatus = "Successful"
+	} else if job.Status.Failed > 0 {
+		newStatus = "Failed"
+	} else {
+		// Skip update for non-terminal states
+		return nil
+	}
+
+	// Skip if status hasn't changed
+	if operarius.Status.LastExecutionStatus == newStatus {
+		return nil
+	}
+
+	operarius.Status.LastExecutionStatus = newStatus
+
+	// Update via API
+	if err := s.operariusClient.UpdateStatus(ctx, operarius); err != nil {
+		return fmt.Errorf("failed to update Operarius status: %w", err)
+	}
+
+	log.Info("Updated Operarius status from job",
+		zap.String("operarius", operarius.Name),
+		zap.String("job", job.Name),
+		zap.String("status", newStatus))
 
 	return nil
 }

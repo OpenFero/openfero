@@ -22,9 +22,14 @@ type Alert struct {
 
 // JobInfo contains information about a triggered job
 type JobInfo struct {
-	ConfigMapName string `json:"configMapName,omitempty"`
-	JobName       string `json:"jobName,omitempty"`
-	Image         string `json:"image,omitempty"`
+	ConfigMapName       string     `json:"configMapName,omitempty"`
+	JobName             string     `json:"jobName,omitempty"`
+	Namespace           string     `json:"namespace,omitempty"`
+	Image               string     `json:"image,omitempty"`
+	ExecutionCount      int32      `json:"executionCount,omitempty"`
+	LastExecutionTime   *time.Time `json:"lastExecutionTime,omitempty"`
+	LastExecutedJobName string     `json:"lastExecutedJobName,omitempty"`
+	LastExecutionStatus string     `json:"status,omitempty"`
 }
 
 // Store defines the interface for alert storage implementations
