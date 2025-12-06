@@ -19,18 +19,20 @@ defineProps<{
 
         <!-- Jobs table -->
         <template v-else>
-            <div v-if="jobs.length > 0" class="overflow-x-auto">
+            <div v-if="jobs.length > 0"
+                class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
                 <table class="w-full text-sm text-left">
-                    <thead class="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-100 dark:bg-gray-800">
+                    <thead
+                        class="text-xs text-primary-900 dark:text-gray-300 uppercase bg-primary-100 dark:bg-gray-800 font-bold border-b border-primary-200 dark:border-gray-700">
                         <tr>
-                            <th scope="col" class="px-4 py-3">ConfigMap Name</th>
-                            <th scope="col" class="px-4 py-3">Job Name</th>
+                            <th scope="col" class="px-4 py-3">Source / Operarius</th>
+                            <th scope="col" class="px-4 py-3">Target Alert / Job</th>
                             <th scope="col" class="px-4 py-3">Container Image</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                         <tr v-for="job in jobs" :key="job.jobName"
-                            class="bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                            class="bg-white dark:bg-gray-900 hover:bg-primary-50 dark:hover:bg-gray-800 transition-colors">
                             <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ job.configMapName }}</td>
                             <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ job.jobName }}</td>
                             <td class="px-4 py-3">

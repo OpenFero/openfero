@@ -48,7 +48,15 @@ test-operarius: ## Run Operarius-specific tests
 test-coverage: ## Run tests with coverage report
 	$(GOTEST) -coverprofile=coverage.out -covermode=atomic ./...
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
-	@echo "Coverage report generated: coverage.html"
+
+.PHONY: dev
+dev: ## Run local development environment (backend with air, frontend with vite)
+	@echo "Starting local development environment..."
+	@echo "Backend will run on http://localhost:8080"
+	@echo "Frontend will run on http://localhost:5173"
+	@trap 'kill %1' SIGINT; \
+	$(HOME)/go/bin/air & \
+	cd frontend && npm run dev
 
 # E2E Test configuration
 KIND_CLUSTER_NAME ?= openfero-e2e
@@ -194,3 +202,22 @@ show-crds: ## Show generated CRD content
 migration-check: ## Check for ConfigMap-based operarios that need migration
 	@echo "Checking for existing ConfigMap-based operarios..."
 	@kubectl get configmap -l app=openfero -A || echo "No openfero ConfigMaps found"
+
+.PHONY: run-local-docker
+run-local-docker: ## Build frontend, build docker image, and run locally connected to Kind
+	@echo "Building frontend..."
+	cd frontend && npm install && npm run build
+	@echo "Building static binary..."
+	$(MAKE) build-static
+	@echo "Building docker image..."
+	docker build -t openfero:local -f goreleaser.dockerfile .
+	@echo "Running openfero:local connected to Kind..."
+	docker run --rm --net=host -u 0 \
+		-v $(HOME)/.kube/config:/root/.kube/config \
+		-e KUBECONFIG=/root/.kube/config \
+		openfero:local \
+		--logLevel=debug \
+		--kubeconfig=/root/.kube/config \
+		--useOperariusCRDs=true \
+		--configmapNamespace=openfero \
+		--jobDestinationNamespace=openfero

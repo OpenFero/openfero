@@ -74,7 +74,7 @@ onMounted(() => {
                         class="nav-link px-3 py-2 rounded-md text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
                         :class="{ 'text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-white/10': route.path === '/jobs' }"
                         to="/jobs">
-                        Jobs
+                        Remediation Rules
                     </RouterLink>
                 </li>
             </ul>
@@ -189,10 +189,10 @@ onMounted(() => {
                     <dl v-else-if="appStore.buildInfo" class="grid grid-cols-3 gap-y-2 text-sm">
                         <dt class="font-medium text-gray-900 dark:text-gray-200">Version</dt>
                         <dd class="col-span-2 font-mono text-gray-600 dark:text-gray-400">{{ appStore.buildInfo.version
-                            }}</dd>
+                        }}</dd>
                         <dt class="font-medium text-gray-900 dark:text-gray-200">Commit</dt>
                         <dd class="col-span-2 font-mono text-gray-600 dark:text-gray-400">{{ appStore.buildInfo.commit
-                            }}</dd>
+                        }}</dd>
                         <dt class="font-medium text-gray-900 dark:text-gray-200">Build Date</dt>
                         <dd class="col-span-2 font-mono text-gray-600 dark:text-gray-400">{{
                             appStore.buildInfo.buildDate }}</dd>

@@ -208,48 +208,71 @@ func (s *Server) JobsAPIHandler(w http.ResponseWriter, r *http.Request) {
 		zap.String("method", r.Method),
 		zap.String("remoteAddr", r.RemoteAddr))
 
-	// Get all ConfigMaps from store
-	configMaps := s.KubeClient.ConfigMapStore.List()
-	log.Debug("Retrieved ConfigMaps from store", zap.Int("count", len(configMaps)))
-
 	var jobInfos []models.JobInfo
-	for _, obj := range configMaps {
-		configMap := obj.(*corev1.ConfigMap)
 
-		// Process each job definition in ConfigMap
-		for name, jobDef := range configMap.Data {
-			log.Debug("Processing job definition",
-				zap.String("configMap", configMap.Name),
-				zap.String("jobName", name))
-
-			// Parse YAML job definition
-			yamlJobDefinition := []byte(jobDef)
-			jsonBytes, err := yaml.YAMLToJSON(yamlJobDefinition)
-			if err != nil {
-				log.Error("Failed to convert YAML job definition to JSON",
-					zap.String("configMap", configMap.Name),
-					zap.String("jobName", name),
-					zap.Error(err))
-				continue
-			}
-
-			jobObject := &batchv1.Job{}
-			if err := json.Unmarshal(jsonBytes, jobObject); err != nil {
-				log.Error("Failed to unmarshal job definition",
-					zap.String("configMap", configMap.Name),
-					zap.String("jobName", name),
-					zap.Error(err))
-				continue
-			}
-
-			// Extract container image
-			if len(jobObject.Spec.Template.Spec.Containers) > 0 {
-				image := jobObject.Spec.Template.Spec.Containers[0].Image
+	// Check if we should use Operarius CRDs
+	if s.UseOperariusCRDs && s.OperariusService != nil {
+		// Fetch Operarii
+		operarii, err := s.OperariusService.GetOperariiForNamespace(r.Context(), s.KubeClient.ConfigmapNamespace)
+		if err != nil {
+			log.Error("Failed to get Operarii", zap.Error(err))
+		} else {
+			log.Debug("Retrieved Operarii", zap.Int("count", len(operarii)))
+			for _, op := range operarii {
+				image := "unknown"
+				if len(op.Spec.JobTemplate.Spec.Template.Spec.Containers) > 0 {
+					image = op.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
+				}
 				jobInfos = append(jobInfos, models.JobInfo{
-					ConfigMapName: configMap.Name,
-					JobName:       name,
+					ConfigMapName: op.Name,
+					JobName:       op.Spec.AlertSelector.AlertName, // Use AlertName as JobName for display
 					Image:         image,
 				})
+			}
+		}
+	} else {
+		// Get all ConfigMaps from store
+		configMaps := s.KubeClient.ConfigMapStore.List()
+		log.Debug("Retrieved ConfigMaps from store", zap.Int("count", len(configMaps)))
+
+		for _, obj := range configMaps {
+			configMap := obj.(*corev1.ConfigMap)
+
+			// Process each job definition in ConfigMap
+			for name, jobDef := range configMap.Data {
+				log.Debug("Processing job definition",
+					zap.String("configMap", configMap.Name),
+					zap.String("jobName", name))
+
+				// Parse YAML job definition
+				yamlJobDefinition := []byte(jobDef)
+				jsonBytes, err := yaml.YAMLToJSON(yamlJobDefinition)
+				if err != nil {
+					log.Error("Failed to convert YAML job definition to JSON",
+						zap.String("configMap", configMap.Name),
+						zap.String("jobName", name),
+						zap.Error(err))
+					continue
+				}
+
+				jobObject := &batchv1.Job{}
+				if err := json.Unmarshal(jsonBytes, jobObject); err != nil {
+					log.Error("Failed to unmarshal job definition",
+						zap.String("configMap", configMap.Name),
+						zap.String("jobName", name),
+						zap.Error(err))
+					continue
+				}
+
+				// Extract container image
+				if len(jobObject.Spec.Template.Spec.Containers) > 0 {
+					image := jobObject.Spec.Template.Spec.Containers[0].Image
+					jobInfos = append(jobInfos, models.JobInfo{
+						ConfigMapName: configMap.Name,
+						JobName:       name,
+						Image:         image,
+					})
+				}
 			}
 		}
 	}
