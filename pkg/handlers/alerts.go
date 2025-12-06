@@ -99,77 +99,78 @@ func (s *Server) handleOperariusBasedJobs(ctx context.Context, hookMessage model
 		zap.String("groupKey", hookMessage.GroupKey),
 		zap.Int("alertCount", len(hookMessage.Alerts)))
 
+	var jobInfo *alertstore.JobInfo
+
 	// Get all available Operarii (in a real implementation, you'd use a controller-runtime client)
 	// For now, this is a placeholder - you'll need to implement GetOperariiForNamespace
 	operarii, err := s.OperariusService.GetOperariiForNamespace(ctx, "openfero")
 	if err != nil {
 		log.Error("Failed to get Operarii", zap.Error(err))
-		return
-	}
+		// Continue to store alert even if we can't get Operarii
+	} else {
+		// Find matching Operarius
+		operarius, err := s.OperariusService.FindMatchingOperarius(hookMessage, operarii)
+		if err != nil {
+			log.Info("No matching Operarius found - alert will be stored without remediation", zap.Error(err))
+		} else {
+			log.Info("Found matching Operarius",
+				zap.String("operarius", operarius.Name),
+				zap.String("namespace", operarius.Namespace),
+				zap.Int32("priority", operarius.Spec.Priority))
 
-	// Find matching Operarius
-	operarius, err := s.OperariusService.FindMatchingOperarius(hookMessage, operarii)
-	if err != nil {
-		log.Warn("No matching Operarius found", zap.Error(err))
-		return
-	}
+			// Check deduplication
+			shouldCreate, err := s.OperariusService.CheckDeduplication(ctx, operarius, hookMessage)
+			if err != nil {
+				log.Error("Failed to check deduplication", zap.Error(err))
+			} else if !shouldCreate {
+				log.Info("Skipping job creation due to deduplication",
+					zap.String("operarius", operarius.Name),
+					zap.String("groupKey", hookMessage.GroupKey))
+			} else {
+				// Create the job
+				job, err := s.OperariusService.CreateJobFromOperarius(ctx, operarius, hookMessage)
+				if err != nil {
+					log.Error("Failed to create job from Operarius",
+						zap.Error(err),
+						zap.String("operarius", operarius.Name))
+					metadata.JobsFailedTotal.Inc()
+				} else {
+					// Increment successful job creation metric
+					metadata.JobsCreatedTotal.Inc()
 
-	log.Info("Found matching Operarius",
-		zap.String("operarius", operarius.Name),
-		zap.String("namespace", operarius.Namespace),
-		zap.Int32("priority", operarius.Spec.Priority))
+					log.Info("Successfully created remediation job",
+						zap.String("jobName", job.Name),
+						zap.String("operarius", operarius.Name),
+						zap.String("namespace", job.Namespace),
+						zap.String("groupKey", hookMessage.GroupKey))
 
-	// Check deduplication
-	shouldCreate, err := s.OperariusService.CheckDeduplication(ctx, operarius, hookMessage)
-	if err != nil {
-		log.Error("Failed to check deduplication", zap.Error(err))
-		return
-	}
+					// Update Operarius status with execution info
+					if err := s.OperariusService.UpdateOperariusStatus(ctx, operarius, job.Name); err != nil {
+						log.Warn("Failed to update Operarius status",
+							zap.Error(err),
+							zap.String("operarius", operarius.Name))
+						// Don't return - job was created successfully, status update is best-effort
+					}
 
-	if !shouldCreate {
-		log.Info("Skipping job creation due to deduplication",
-			zap.String("operarius", operarius.Name),
-			zap.String("groupKey", hookMessage.GroupKey))
-		return
-	}
-
-	// Create the job
-	job, err := s.OperariusService.CreateJobFromOperarius(ctx, operarius, hookMessage)
-	if err != nil {
-		log.Error("Failed to create job from Operarius",
-			zap.Error(err),
-			zap.String("operarius", operarius.Name))
-		metadata.JobsFailedTotal.Inc()
-		return
-	}
-
-	// Increment successful job creation metric
-	metadata.JobsCreatedTotal.Inc()
-
-	log.Info("Successfully created remediation job",
-		zap.String("jobName", job.Name),
-		zap.String("operarius", operarius.Name),
-		zap.String("namespace", job.Namespace),
-		zap.String("groupKey", hookMessage.GroupKey))
-
-	// Update Operarius status with execution info
-	if err := s.OperariusService.UpdateOperariusStatus(ctx, operarius, job.Name); err != nil {
-		log.Warn("Failed to update Operarius status",
-			zap.Error(err),
-			zap.String("operarius", operarius.Name))
-		// Don't return - job was created successfully, status update is best-effort
+					jobInfo = &alertstore.JobInfo{
+						JobName:       job.Name,
+						ConfigMapName: operarius.Name, // Operarius name for tracking
+						Image:         getFirstContainerImage(job),
+					}
+				}
+			}
+		}
 	}
 
 	// Store alert in alert store for tracking and broadcast to SSE clients
 	for _, alert := range hookMessage.Alerts {
-		jobInfo := &alertstore.JobInfo{
-			JobName:       job.Name,
-			ConfigMapName: operarius.Name, // Operarius name for tracking
-			Image:         getFirstContainerImage(job),
+		if jobInfo != nil {
+			// Use the service function which handles both storage and SSE broadcast
+			services.SaveAlertWithJobInfo(s.AlertStore, alert, hookMessage.Status, jobInfo)
+		} else {
+			// Save without job info
+			services.SaveAlert(s.AlertStore, alert, hookMessage.Status)
 		}
-
-		// Use the service function which handles both storage and SSE broadcast
-		services.SaveAlertWithJobInfo(s.AlertStore, alert, hookMessage.Status, jobInfo)
 	}
 }
 

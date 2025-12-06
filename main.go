@@ -229,7 +229,7 @@ func main() {
 
 		// Initialize informer and wait for cache sync
 		ctx := context.Background()
-		_, err = operariusClient.InitOperariusInformer(ctx, nil)
+		_, err = operariusClient.InitOperariusInformer(ctx, nil, kubeconfig)
 		if err != nil {
 			log.Warn("Failed to initialize Operarius informer, falling back to API calls",
 				zap.Error(err))
