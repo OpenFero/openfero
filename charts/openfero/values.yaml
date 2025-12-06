@@ -117,6 +117,22 @@ customArgs: []
   # - "--logLevel=debug"
   # - "--alertStoreType=memory"
 
+# Authentication Configuration
+auth:
+  enabled: false
+  method: none # none, basic, bearer
+  basic:
+    username: ""
+    password: ""
+    # Reference existing secret
+    existingSecret: ""
+    secretKey: ""
+  bearer:
+    token: ""
+    # Reference existing secret
+    existingSecret: ""
+    secretKey: ""
+
 # Operarius CRD Configuration
 operarius:
   # Enable Operarius CRD support
