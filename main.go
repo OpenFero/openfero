@@ -20,6 +20,7 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 	"go.uber.org/zap"
 
+	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/OpenFero/openfero/pkg/alertstore"
@@ -220,9 +221,32 @@ func main() {
 	}
 	log.Info("Using Operarius job selector", zap.String("selector", metav1.FormatLabelSelector(jobSelector)))
 
-	// Initialize Job informer to track job metrics (success/failure)
+	// Initialize Job informer with update callback
 	// We watch jobs in the same namespace as Operarius CRDs
-	kubernetes.InitJobInformer(clientset, *operariusNamespace, jobSelector, nil)
+	kubernetes.InitJobInformer(clientset, *operariusNamespace, jobSelector, func(oldJob, newJob *batchv1.Job) {
+		if operariusService != nil && newJob != nil {
+			// Check if job is managed by OpenFero
+			if operariusName, ok := newJob.Labels["openfero.io/operarius"]; ok {
+				ctx := context.Background()
+				// Find the Operarius
+				operarius, err := operariusService.GetOperarius(ctx, operariusName, newJob.Namespace)
+				if err != nil {
+					log.Error("Failed to get Operarius for job update",
+						zap.String("operarius", operariusName),
+						zap.Error(err))
+					return
+				}
+
+				// Update status based on job status
+				if err := operariusService.UpdateOperariusStatusFromJob(ctx, operarius, newJob); err != nil {
+					log.Error("Failed to update Operarius status from job",
+						zap.String("operarius", operariusName),
+						zap.String("job", newJob.Name),
+						zap.Error(err))
+				}
+			}
+		}
+	})
 
 	// Pass build information to handlers
 	handlers.SetBuildInfo(version, commit, date)

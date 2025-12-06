@@ -11,11 +11,15 @@ const formatDate = (dateString?: string) => {
     return new Date(dateString).toLocaleString()
 }
 
-const getConditionColor = (type: string, status: string) => {
-    if (type === 'Successful' && status === 'True') return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-    if (type === 'Failed' && status === 'True') return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
-    if (type === 'Executing' && status === 'True') return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
-    if (type === 'Pending') return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+const getStatusColor = (status?: string) => {
+    if (!status) return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+
+    const s = status.toLowerCase()
+    if (s === 'successful' || s === 'succeeded') return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+    if (s === 'failed') return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+    if (s === 'running' || s === 'executing') return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
+    if (s === 'pending') return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+
     return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
 }
 </script>
@@ -39,7 +43,7 @@ const getConditionColor = (type: string, status: string) => {
                         class="text-xs text-primary-900 dark:text-gray-300 uppercase bg-primary-100 dark:bg-gray-800 font-bold border-b border-primary-200 dark:border-gray-700">
                         <tr>
                             <th scope="col" class="px-4 py-3">Source / Operarius</th>
-                            <th scope="col" class="px-4 py-3">Target Alert / Job</th>
+                            <th scope="col" class="px-4 py-3">Target Alert</th>
                             <th scope="col" class="px-4 py-3">Container Image</th>
                             <th scope="col" class="px-4 py-3">Executions</th>
                             <th scope="col" class="px-4 py-3">Last Execution</th>
@@ -66,13 +70,10 @@ const getConditionColor = (type: string, status: string) => {
                                 <span v-else>-</span>
                             </td>
                             <td class="px-4 py-3">
-                                <div v-if="job.conditions && job.conditions.length > 0" class="flex flex-wrap gap-1">
-                                    <span v-for="condition in job.conditions" :key="condition.type"
-                                        :class="['px-2 py-0.5 rounded text-xs font-medium', getConditionColor(condition.type, condition.status)]"
-                                        :title="condition.message">
-                                        {{ condition.type }}
-                                    </span>
-                                </div>
+                                <span v-if="job.status"
+                                    :class="['px-2 py-0.5 rounded text-xs font-medium', getStatusColor(job.status)]">
+                                    {{ job.status }}
+                                </span>
                                 <span v-else class="text-gray-400">-</span>
                             </td>
                         </tr>

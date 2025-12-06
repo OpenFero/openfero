@@ -1211,12 +1211,12 @@ func TestUpdateOperariusStatus(t *testing.T) {
 	}
 
 	tests := []struct {
-		name            string
-		mockClient      *MockOperariusClient
-		hasClient       bool
-		jobName         string
-		expectError     bool
-		expectedCount   int32
+		name          string
+		mockClient    *MockOperariusClient
+		hasClient     bool
+		jobName       string
+		expectError   bool
+		expectedCount int32
 	}{
 		{
 			name:          "no client configured skips update",
@@ -1233,10 +1233,10 @@ func TestUpdateOperariusStatus(t *testing.T) {
 					return nil
 				},
 			},
-			hasClient:       true,
-			jobName:         "test-job-123",
-			expectError:     false,
-			expectedCount:   6,
+			hasClient:     true,
+			jobName:       "test-job-123",
+			expectError:   false,
+			expectedCount: 6,
 		},
 		{
 			name: "update error is propagated",
@@ -1280,7 +1280,6 @@ func TestUpdateOperariusStatus(t *testing.T) {
 		})
 	}
 }
-
 
 // TestApplyTemplateVariables_Args tests template processing in container args
 func TestApplyTemplateVariables_Args(t *testing.T) {

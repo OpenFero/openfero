@@ -36,6 +36,8 @@ export interface JobInfo {
   configMapName: string;
   /** Name of the job */
   jobName: string;
+  /** Namespace of the job */
+  namespace?: string;
   /** Container image used by the job */
   image: string;
   /** Total number of jobs created from this Operarius */
@@ -47,7 +49,7 @@ export interface JobInfo {
   /** Latest available observations of an Operarius's state */
   conditions?: JobCondition[];
   /** Job execution status */
-  status?: "pending" | "running" | "succeeded" | "failed";
+  status?: string;
   /** Time when the job started */
   startedAt?: string;
   /** Time when the job completed */

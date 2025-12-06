@@ -55,7 +55,7 @@ onMounted(() => {
                 </div>
                 <div class="flex items-start gap-2">
                     <span
-                        class="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 mt-0.5">Executing</span>
+                        class="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 mt-0.5">Running</span>
                     <span class="text-gray-600 dark:text-gray-400">A remediation job is currently being
                         processed.</span>
                 </div>

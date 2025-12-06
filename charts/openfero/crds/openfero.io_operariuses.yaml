@@ -9084,6 +9084,10 @@ spec:
                 description: LastExecutedJobName represents the name of the last job
                   created
                 type: string
+              lastExecutionStatus:
+                description: LastExecutionStatus represents the status of the last
+                  execution
+                type: string
               lastExecutionTime:
                 description: LastExecutionTime represents the last time a job was
                   created from this Operarius

@@ -86,6 +86,10 @@ type OperariusStatus struct {
 	// LastExecutedJobName represents the name of the last job created
 	// +optional
 	LastExecutedJobName string `json:"lastExecutedJobName,omitempty"`
+
+	// LastExecutionStatus represents the status of the last execution
+	// +optional
+	LastExecutionStatus string `json:"lastExecutionStatus,omitempty"`
 }
 
 // +kubebuilder:object:root=true

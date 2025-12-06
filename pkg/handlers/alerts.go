@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/OpenFero/openfero/pkg/alertstore"
 	"github.com/OpenFero/openfero/pkg/kubernetes"
@@ -14,6 +15,7 @@ import (
 	"github.com/OpenFero/openfero/pkg/utils"
 	"go.uber.org/zap"
 	batchv1 "k8s.io/api/batch/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -140,10 +142,21 @@ func (s *Server) handleOperariusBasedJobs(ctx context.Context, hookMessage model
 						// Don't return - job was created successfully, status update is best-effort
 					}
 
+					var lastExecutionTime *time.Time
+					if operarius.Status.LastExecutionTime != nil {
+						t := operarius.Status.LastExecutionTime.Time
+						lastExecutionTime = &t
+					}
+
 					jobInfo = &alertstore.JobInfo{
-						JobName:       job.Name,
-						ConfigMapName: operarius.Name, // Operarius name for tracking
-						Image:         getFirstContainerImage(job),
+						JobName:             job.Name,
+						Namespace:           job.Namespace,
+						ConfigMapName:       operarius.Name, // Operarius name for tracking
+						Image:               getFirstContainerImage(job),
+						ExecutionCount:      operarius.Status.ExecutionCount,
+						LastExecutionTime:   lastExecutionTime,
+						LastExecutedJobName: operarius.Status.LastExecutedJobName,
+						LastExecutionStatus: operarius.Status.LastExecutionStatus,
 					}
 				}
 			}
@@ -181,6 +194,31 @@ func (s *Server) AlertStoreGetHandler(w http.ResponseWriter, r *http.Request) {
 		log.Error("Error retrieving alerts", zap.Error(err))
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// Enrich alerts with live job status
+	ctx := r.Context()
+	for i := range alerts {
+		if alerts[i].JobInfo != nil && alerts[i].JobInfo.JobName != "" && alerts[i].JobInfo.Namespace != "" {
+			job, err := s.KubeClient.Clientset.BatchV1().Jobs(alerts[i].JobInfo.Namespace).Get(ctx, alerts[i].JobInfo.JobName, metav1.GetOptions{})
+			if err == nil {
+				// Determine status
+				status := "Pending"
+				if job.Status.Succeeded > 0 {
+					status = "Successful"
+				} else if job.Status.Failed > 0 {
+					status = "Failed"
+				} else if job.Status.Active > 0 {
+					status = "Running"
+				}
+				alerts[i].JobInfo.LastExecutionStatus = status
+			} else {
+				// Job might be deleted or error
+				log.Debug("Failed to get job for alert",
+					zap.String("job", alerts[i].JobInfo.JobName),
+					zap.Error(err))
+			}
+		}
 	}
 
 	w.Header().Set(ContentTypeHeader, ApplicationJSONVal)
