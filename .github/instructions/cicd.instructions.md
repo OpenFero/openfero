@@ -52,7 +52,7 @@ frontend-build:
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
       with:
-        node-version: "20"
+        node-version-file: frontend/.nvmrc
         cache: "npm"
         cache-dependency-path: frontend/package-lock.json
     - run: npm ci
@@ -110,7 +110,7 @@ test-frontend:
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
       with:
-        node-version: "20"
+        node-version-file: frontend/.nvmrc
         cache: "npm"
         cache-dependency-path: frontend/package-lock.json
     - run: npm ci
