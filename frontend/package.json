@@ -14,8 +14,8 @@
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
     "lint": "eslint . --fix --cache",
-    "format": "biome format --write src/",
-    "check": "biome check src/"
+    "format": "biome format --write .",
+    "check": "biome check ."
   },
   "dependencies": {
     "pinia": "^3.0.4",
