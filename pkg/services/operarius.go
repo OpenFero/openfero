@@ -393,16 +393,6 @@ func (s *OperariusService) UpdateOperariusStatus(ctx context.Context, operarius 
 	operarius.Status.LastExecutionTime = &now
 	operarius.Status.LastExecutedJobName = jobName
 
-	// Update condition to Pending
-	readyCondition := operariusv1alpha1.OperariusCondition{
-		Type:               operariusv1alpha1.OperariusConditionPending,
-		Status:             metav1.ConditionTrue,
-		LastTransitionTime: now,
-		Reason:             "JobCreated",
-		Message:            fmt.Sprintf("Successfully created job %s", jobName),
-	}
-	operarius.Status.Conditions = updateConditions(operarius.Status.Conditions, readyCondition)
-
 	// Update via API
 	if err := s.operariusClient.UpdateStatus(ctx, operarius); err != nil {
 		return fmt.Errorf("failed to update Operarius status: %w", err)
@@ -428,72 +418,4 @@ func (s *OperariusService) GetOperarius(ctx context.Context, name, namespace str
 	}
 
 	return s.operariusClient.Get(name)
-}
-
-// UpdateOperariusStatusFromJob updates the Operarius status based on the job status
-func (s *OperariusService) UpdateOperariusStatusFromJob(ctx context.Context, operarius *operariusv1alpha1.Operarius, job *batchv1.Job) error {
-	if s.operariusClient == nil {
-		return nil
-	}
-
-	// Determine status based on job conditions
-	var conditionType operariusv1alpha1.OperariusConditionType
-	var reason, message string
-	var status metav1.ConditionStatus
-
-	if job.Status.Succeeded > 0 {
-		conditionType = operariusv1alpha1.OperariusConditionSuccessful
-		status = metav1.ConditionTrue
-		reason = "JobSucceeded"
-		message = fmt.Sprintf("Job %s succeeded", job.Name)
-	} else if job.Status.Failed > 0 {
-		conditionType = operariusv1alpha1.OperariusConditionFailed
-		status = metav1.ConditionTrue
-		reason = "JobFailed"
-		message = fmt.Sprintf("Job %s failed", job.Name)
-	} else if job.Status.Active > 0 {
-		conditionType = operariusv1alpha1.OperariusConditionExecuting
-		status = metav1.ConditionTrue
-		reason = "JobRunning"
-		message = fmt.Sprintf("Job %s is running", job.Name)
-	} else {
-		// Pending or unknown
-		conditionType = operariusv1alpha1.OperariusConditionPending
-		status = metav1.ConditionUnknown
-		reason = "JobPending"
-		message = fmt.Sprintf("Job %s is pending", job.Name)
-	}
-
-	// Update condition
-	newCondition := operariusv1alpha1.OperariusCondition{
-		Type:               conditionType,
-		Status:             status,
-		LastTransitionTime: metav1.Now(),
-		Reason:             reason,
-		Message:            message,
-	}
-	operarius.Status.Conditions = updateConditions(operarius.Status.Conditions, newCondition)
-
-	// Update via API
-	if err := s.operariusClient.UpdateStatus(ctx, operarius); err != nil {
-		return fmt.Errorf("failed to update Operarius status: %w", err)
-	}
-
-	log.Debug("Updated Operarius status from job",
-		zap.String("operarius", operarius.Name),
-		zap.String("job", job.Name),
-		zap.String("status", string(conditionType)))
-
-	return nil
-}
-
-// updateConditions updates or adds a condition to the conditions slice
-func updateConditions(conditions []operariusv1alpha1.OperariusCondition, newCondition operariusv1alpha1.OperariusCondition) []operariusv1alpha1.OperariusCondition {
-	for i, c := range conditions {
-		if c.Type == newCondition.Type {
-			conditions[i] = newCondition
-			return conditions
-		}
-	}
-	return append(conditions, newCondition)
 }

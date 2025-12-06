@@ -62,22 +62,6 @@ type JobInfo struct {
 	LastExecutionTime *time.Time `json:"lastExecutionTime,omitempty"`
 	// Name of the last job created
 	LastExecutedJobName string `json:"lastExecutedJobName,omitempty"`
-	// Latest available observations of an Operarius's state
-	Conditions []JobCondition `json:"conditions,omitempty"`
-}
-
-// JobCondition represents a condition of a job definition
-type JobCondition struct {
-	// Type of condition
-	Type string `json:"type"`
-	// Status of the condition
-	Status string `json:"status"`
-	// Last time the condition transitioned from one status to another
-	LastTransitionTime time.Time `json:"lastTransitionTime"`
-	// Unique, one-word, CamelCase reason for the condition's last transition
-	Reason string `json:"reason,omitempty"`
-	// Human-readable message indicating details about last transition
-	Message string `json:"message,omitempty"`
 }
 
 // ToAlertStoreAlert converts an Alert to alertstore.Alert
