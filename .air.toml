@@ -3,8 +3,7 @@ tmp_dir = "tmp"
 
 [build]
   cmd = "go build -o ./tmp/main ."
-  bin = "./tmp/main"
-  full_bin = "./tmp/main --kubeconfig=/home/jelinek/.kube/config --useOperariusCRDs=true --configmapNamespace=openfero --jobDestinationNamespace=openfero --logLevel=debug"
+  entrypoint = ["./tmp/main", "--kubeconfig=/home/jelinek/.kube/config", "--useOperariusCRDs=true", "--configmapNamespace=openfero", "--jobDestinationNamespace=openfero", "--logLevel=debug"]
   include_ext = ["go", "tpl", "tmpl", "html"]
   exclude_dir = ["assets", "tmp", "vendor", "frontend/dist", "frontend/node_modules", "charts", "docs", "hack", "operarios", "scripts", "test"]
   include_dir = []
