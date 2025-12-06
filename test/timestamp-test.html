@@ -184,14 +184,14 @@
             );
             if (goMatch) {
               const [, datePart, timePart, msPart, offset] = goMatch;
-              const isoString = `${datePart}T${timePart}${msPart ? "." + msPart : ""}${offset}`;
+              const isoString = `${datePart}T${timePart}${msPart ? `.${msPart}` : ""}${offset}`;
               date = new Date(isoString);
             } else {
               // Standard formats
               date = new Date(test.timestamp);
             }
 
-            if (!isNaN(date.getTime())) {
+            if (!Number.isNaN(date.getTime())) {
               // Format options
               const options = {
                 dateStyle: "medium",
@@ -226,7 +226,7 @@
               expectedCell.textContent = "Unable to parse with native JS";
             }
           } catch (e) {
-            expectedCell.textContent = "Error: " + e.message;
+            expectedCell.textContent = `Error: ${e.message}`;
           }
           row.appendChild(expectedCell);
 

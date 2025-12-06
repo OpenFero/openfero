@@ -6,7 +6,7 @@ import { useJobsStore } from '@/stores'
 const jobsStore = useJobsStore()
 
 onMounted(() => {
-    jobsStore.fetch()
+  jobsStore.fetch()
 })
 </script>
 

@@ -1,5 +1,5 @@
-import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
+import { computed, ref } from 'vue'
 import { fetchAlerts } from '@/api/alerts'
 import { ApiError } from '@/api/client'
 import type { AlertStoreEntry } from '@/types'
@@ -19,7 +19,7 @@ export const useAlertsStore = defineStore('alerts', () => {
     if (!searchQuery.value) return alerts.value
     const query = searchQuery.value.toLowerCase()
     return alerts.value.filter((entry) => {
-      const alertName = entry.alert.labels['alertname'] || ''
+      const alertName = entry.alert.labels.alertname || ''
       const labels = Object.entries(entry.alert.labels)
         .map(([k, v]) => `${k}:${v}`)
         .join(' ')
@@ -58,8 +58,9 @@ export const useAlertsStore = defineStore('alerts', () => {
     alertIndex: number,
     status: 'pending' | 'running' | 'succeeded' | 'failed',
   ) {
-    if (alerts.value[alertIndex]?.jobInfo) {
-      alerts.value[alertIndex].jobInfo!.status = status
+    const alert = alerts.value[alertIndex]
+    if (alert?.jobInfo) {
+      alert.jobInfo.status = status
     }
   }
 

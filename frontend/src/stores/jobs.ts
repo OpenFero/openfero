@@ -1,5 +1,5 @@
-import { ref } from 'vue'
 import { defineStore } from 'pinia'
+import { ref } from 'vue'
 import { fetchJobs } from '@/api/alerts'
 import { ApiError } from '@/api/client'
 import type { JobInfo } from '@/types'

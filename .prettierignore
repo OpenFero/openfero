@@ -1,9 +1,0 @@
-# Existing ignores
-.github/linters/.jscpd.json
-charts/
-web/assets/js/htmx.min.js
-web/assets/js/bootstrap.bundle.min.js
-web/assets/css/bootstrap.min.css
-web/assets/bootstrap-icons-1.11.3/
-pkg/docs/swagger.json
-pkg/docs/swagger.yaml

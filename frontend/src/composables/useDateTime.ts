@@ -30,7 +30,7 @@ export function useDateTime() {
       const date = dateInput instanceof Date ? dateInput : new Date(dateInput)
 
       // Check for invalid date
-      if (isNaN(date.getTime())) {
+      if (Number.isNaN(date.getTime())) {
         return 'Invalid date'
       }
 
@@ -92,7 +92,7 @@ export function useDateTime() {
     try {
       const date = dateInput instanceof Date ? dateInput : new Date(dateInput)
 
-      if (isNaN(date.getTime())) {
+      if (Number.isNaN(date.getTime())) {
         return 'Invalid time'
       }
 
@@ -119,7 +119,7 @@ export function useDateTime() {
     try {
       const date = dateInput instanceof Date ? dateInput : new Date(dateInput)
 
-      if (isNaN(date.getTime())) {
+      if (Number.isNaN(date.getTime())) {
         return 'Invalid date'
       }
 

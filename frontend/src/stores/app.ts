@@ -1,5 +1,5 @@
-import { ref } from 'vue'
 import { defineStore } from 'pinia'
+import { ref } from 'vue'
 import { fetchBuildInfo } from '@/api/app'
 import type { BuildInfo } from '@/types'
 

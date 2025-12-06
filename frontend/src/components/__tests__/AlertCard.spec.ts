@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
-import AlertCard from '../AlertCard.vue'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AlertStoreEntry } from '@/types'
+import AlertCard from '../AlertCard.vue'
 
 // Mock useDateTime composable
 vi.mock('@/composables/useDateTime', () => ({
@@ -121,7 +121,7 @@ describe('AlertCard', () => {
       await wrapper.find('button').trigger('click')
 
       expect(wrapper.emitted('toggle')).toBeTruthy()
-      expect(wrapper.emitted('toggle')![0]).toEqual([5])
+      expect(wrapper.emitted('toggle')?.[0]).toEqual([5])
     })
 
     it('should show details when expanded', () => {
