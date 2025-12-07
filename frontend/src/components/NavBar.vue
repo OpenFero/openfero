@@ -6,11 +6,11 @@ import { useAppStore } from '@/stores/app'
 import { useSocketStore } from '@/stores/socket'
 
 defineProps<{
-    showSearch?: boolean
+  showSearch?: boolean
 }>()
 
 const emit = defineEmits<{
-    search: [query: string]
+  search: [query: string]
 }>()
 
 const route = useRoute()
@@ -23,38 +23,38 @@ const showAboutModal = ref(false)
 const mobileMenuOpen = ref(false)
 
 function handleToggleConnection() {
-    console.log('NavBar: Toggling connection. Current state:', {
-        isConnected: socketStore.isConnected,
-        isPaused: socketStore.isPaused
-    })
-    socketStore.toggleConnection()
+  console.log('NavBar: Toggling connection. Current state:', {
+    isConnected: socketStore.isConnected,
+    isPaused: socketStore.isPaused,
+  })
+  socketStore.toggleConnection()
 }
 
 function handleSearch(event: Event) {
-    const target = event.target as HTMLInputElement
-    emit('search', target.value)
+  const target = event.target as HTMLInputElement
+  emit('search', target.value)
 }
 
 function openAboutModal() {
-    showAboutModal.value = true
-    if (!appStore.buildInfo) {
-        appStore.fetchInfo()
-    }
+  showAboutModal.value = true
+  if (!appStore.buildInfo) {
+    appStore.fetchInfo()
+  }
 }
 
 function closeAboutModal() {
-    showAboutModal.value = false
+  showAboutModal.value = false
 }
 
 // Close modal on escape key
 function handleEscape(event: KeyboardEvent) {
-    if (event.key === 'Escape' && showAboutModal.value) {
-        closeAboutModal()
-    }
+  if (event.key === 'Escape' && showAboutModal.value) {
+    closeAboutModal()
+  }
 }
 
 onMounted(() => {
-    document.addEventListener('keydown', handleEscape)
+  document.addEventListener('keydown', handleEscape)
 })
 </script>
 

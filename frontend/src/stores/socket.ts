@@ -1,101 +1,103 @@
-import { defineStore } from "pinia";
-import { ref } from "vue";
-import type { AlertStoreEntry, JobInfo } from "@/types";
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import type { AlertStoreEntry, JobInfo } from '@/types'
 
 export interface WSMessage {
-  type: "alert" | "operarius_update" | "connected";
-  data: AlertStoreEntry | JobInfo | { message: string };
+  type: 'alert' | 'operarius_update' | 'connected'
+  data: AlertStoreEntry | JobInfo | { message: string }
 }
 
-export const useSocketStore = defineStore("socket", () => {
-  const isConnected = ref(false);
-  const isPaused = ref(false);
-  const error = ref<string | null>(null);
-  let socket: WebSocket | null = null;
-  let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+export const useSocketStore = defineStore('socket', () => {
+  const isConnected = ref(false)
+  const isPaused = ref(false)
+  const error = ref<string | null>(null)
+  let socket: WebSocket | null = null
+  let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
 
   // Event listeners
-  const listeners = new Set<(message: WSMessage) => void>();
+  const listeners = new Set<(message: WSMessage) => void>()
 
   function getWebSocketUrl(): string {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = window.location.host;
-    return `${protocol}//${host}/api/ws`;
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const host = window.location.host
+    return `${protocol}//${host}/api/ws`
   }
 
   function connect() {
-    if (socket?.readyState === WebSocket.OPEN) return;
+    if (socket?.readyState === WebSocket.OPEN) return
 
-    isPaused.value = false;
-    const url = getWebSocketUrl();
-    socket = new WebSocket(url);
+    isPaused.value = false
+    const url = getWebSocketUrl()
+    socket = new WebSocket(url)
 
     socket.onopen = () => {
-      isConnected.value = true;
-      error.value = null;
-      console.log("WebSocket connected");
-    };
+      isConnected.value = true
+      error.value = null
+      console.log('WebSocket connected')
+    }
 
     socket.onclose = () => {
-      isConnected.value = false;
-      console.log("WebSocket disconnected");
+      isConnected.value = false
+      console.log('WebSocket disconnected')
       if (!isPaused.value) {
-        scheduleReconnect();
+        scheduleReconnect()
       }
-    };
+    }
 
     socket.onerror = (e) => {
-      console.error("WebSocket error:", e);
-      error.value = "Connection error";
-    };
+      console.error('WebSocket error:', e)
+      error.value = 'Connection error'
+    }
 
     socket.onmessage = (event) => {
       try {
-        const message = JSON.parse(event.data) as WSMessage;
-        listeners.forEach((listener) => listener(message));
+        const message = JSON.parse(event.data) as WSMessage
+        listeners.forEach((listener) => {
+          listener(message)
+        })
       } catch (e) {
-        console.error("Failed to parse WebSocket message:", e);
+        console.error('Failed to parse WebSocket message:', e)
       }
-    };
+    }
   }
 
   function disconnect() {
-    isPaused.value = true;
+    isPaused.value = true
     if (socket) {
       // Remove listeners to prevent race conditions with new connections
-      socket.onclose = null;
-      socket.onmessage = null;
-      socket.onerror = null;
-      socket.close();
-      socket = null;
+      socket.onclose = null
+      socket.onmessage = null
+      socket.onerror = null
+      socket.close()
+      socket = null
     }
     if (reconnectTimeout) {
-      clearTimeout(reconnectTimeout);
-      reconnectTimeout = null;
+      clearTimeout(reconnectTimeout)
+      reconnectTimeout = null
     }
-    isConnected.value = false;
+    isConnected.value = false
   }
 
   function toggleConnection() {
-    console.log("SocketStore: toggleConnection called. isConnected:", isConnected.value);
+    console.log('SocketStore: toggleConnection called. isConnected:', isConnected.value)
     if (isConnected.value) {
-      disconnect();
+      disconnect()
     } else {
-      connect();
+      connect()
     }
   }
 
   function scheduleReconnect() {
-    if (isPaused.value) return;
-    if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    if (isPaused.value) return
+    if (reconnectTimeout) clearTimeout(reconnectTimeout)
     reconnectTimeout = setTimeout(() => {
-      connect();
-    }, 3000);
+      connect()
+    }, 3000)
   }
 
   function addListener(callback: (message: WSMessage) => void) {
-    listeners.add(callback);
-    return () => listeners.delete(callback);
+    listeners.add(callback)
+    return () => listeners.delete(callback)
   }
 
   return {
@@ -106,5 +108,5 @@ export const useSocketStore = defineStore("socket", () => {
     disconnect,
     toggleConnection,
     addListener,
-  };
-});
+  }
+})

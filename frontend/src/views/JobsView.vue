@@ -11,16 +11,16 @@ const showLegend = ref(false)
 let removeListener: (() => void) | null = null
 
 onMounted(() => {
-    jobsStore.fetch()
-    removeListener = socketStore.addListener((message) => {
-        if (message.type === 'operarius_update') {
-            jobsStore.updateJob(message.data as JobInfo)
-        }
-    })
+  jobsStore.fetch()
+  removeListener = socketStore.addListener((message) => {
+    if (message.type === 'operarius_update') {
+      jobsStore.updateJob(message.data as JobInfo)
+    }
+  })
 })
 
 onUnmounted(() => {
-    if (removeListener) removeListener()
+  if (removeListener) removeListener()
 })
 </script>
 
