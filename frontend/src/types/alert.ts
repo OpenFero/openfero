@@ -32,8 +32,8 @@ export interface JobCondition {
  * Information about a triggered remediation job
  */
 export interface JobInfo {
-  /** Name of the ConfigMap containing the job definition */
-  configMapName: string;
+  /** Name of the Operarius containing the job definition */
+  operariusName: string;
   /** Name of the job */
   jobName: string;
   /** Namespace of the job */

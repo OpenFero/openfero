@@ -11,7 +11,7 @@ export async function fetchAlerts(query?: string): Promise<AlertStoreEntry[]> {
 }
 
 /**
- * Fetch job definitions from ConfigMaps
+ * Fetch job definitions from Operarius CRDs
  */
 export async function fetchJobs(): Promise<JobInfo[]> {
   return apiGet<JobInfo[]>('/api/jobs')

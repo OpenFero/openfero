@@ -54,7 +54,7 @@ const getStatusColor = (status?: string) => {
                     <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                         <tr v-for="job in jobs" :key="job.jobName"
                             class="bg-white dark:bg-gray-900 hover:bg-primary-50 dark:hover:bg-gray-800 transition-colors">
-                            <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ job.configMapName }}</td>
+                            <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ job.operariusName }}</td>
                             <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ job.jobName }}</td>
                             <td class="px-4 py-3">
                                 <code
@@ -91,7 +91,7 @@ const getStatusColor = (status?: string) => {
                 </svg>
                 <p class="mt-4 text-lg text-gray-500 dark:text-gray-400">No jobs found.</p>
                 <p class="mt-1 text-sm text-gray-400 dark:text-gray-500">
-                    Jobs are created when alerts trigger remediation ConfigMaps.
+                    Jobs are created when alerts trigger remediation Operarii.
                 </p>
             </div>
         </template>

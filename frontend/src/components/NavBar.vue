@@ -178,7 +178,7 @@ onMounted(() => {
                     <p class="text-lg text-gray-900 dark:text-white">Kubernetes-native self-healing framework</p>
                     <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
                         OpenFero receives Alertmanager webhooks and executes remediation Jobs
-                        defined in ConfigMaps or Operarius CRDs.
+                        defined in Operarius CRDs.
                     </p>
                     <hr class="my-4 border-gray-200 dark:border-gray-700" />
                     <div v-if="appStore.isLoading" class="text-center py-4">
