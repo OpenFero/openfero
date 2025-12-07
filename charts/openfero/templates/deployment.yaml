@@ -47,10 +47,6 @@ spec:
               valueFrom:
                 resourceFieldRef:
                   resource: limits.memory
-            {{- if .Values.operarius.enabled }}
-            - name: USE_OPERARIUS_CRDS
-              value: "{{ .Values.operarius.useOperariusCRDs }}"
-            {{- end }}
             {{- if .Values.auth.enabled }}
             {{- if eq .Values.auth.method "basic" }}
             - name: AUTH_BASIC_USER
@@ -87,8 +83,7 @@ spec:
             {{- if include "openfero.shouldSetAlertStoreType" . }}
             - "--alertStoreType=memberlist"
             {{- end }}
-            {{- if and .Values.operarius.enabled .Values.operarius.useOperariusCRDs }}
-            - "--useOperariusCRDs=true"
+            {{- if .Values.operarius.enabled }}
             - "--operariusNamespace={{ .Release.Namespace }}"
             {{- end }}
             {{- if .Values.auth.enabled }}
