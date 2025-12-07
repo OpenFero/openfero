@@ -280,12 +280,6 @@ func main() {
 	http.HandleFunc("GET /api/about", handlers.AboutAPIHandler)
 	http.HandleFunc("GET /api/ws", handlers.WebSocketHandler) // WebSocket for real-time updates
 
-	// Legacy UI routes (HTML) - kept for backward compatibility
-	http.HandleFunc("GET /ui/", handlers.UIHandler)
-	http.HandleFunc("GET /ui/jobs", server.JobsUIHandler)
-	http.HandleFunc("GET /about", handlers.AboutHandler)
-	http.HandleFunc("GET /legacy-assets/", handlers.AssetsHandler) // Old HTMX assets
-
 	// Swagger documentation
 	http.Handle("GET /swagger/", httpSwagger.Handler(
 		httpSwagger.DeepLinking(true),
