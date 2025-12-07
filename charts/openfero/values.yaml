@@ -113,7 +113,8 @@ tolerations: []
 affinity: {}
 
 # Custom arguments passed to the openfero binary
-customArgs: []
+customArgs:
+  []
   # - "--logLevel=debug"
   # - "--alertStoreType=memory"
 

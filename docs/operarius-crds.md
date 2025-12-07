@@ -8,12 +8,11 @@ This document provides comprehensive information about OpenFero's Operarius Cust
 - [Getting Started](#getting-started)
 - [API Reference](#api-reference)
 - [Examples](#examples)
-- [Migration from ConfigMaps](#migration-from-configmaps)
 - [Development Guide](#development-guide)
 
 ## Overview
 
-Operarius CRDs provide a Kubernetes-native way to define automated remediation actions for Prometheus alerts in OpenFero. They replace the previous ConfigMap-based approach with proper schema validation, enhanced features, and better integration with Kubernetes tooling.
+Operarius CRDs provide a Kubernetes-native way to define automated remediation actions for Prometheus alerts in OpenFero. They are the standard way to define remediation jobs, offering proper schema validation, enhanced features, and better integration with Kubernetes tooling.
 
 ### Key Benefits
 
@@ -350,40 +349,6 @@ spec:
   enabled: true
 ```
 
-## Migration from ConfigMaps
-
-### Quick Migration Steps
-
-1. **Backup existing ConfigMaps**:
-
-   ```bash
-   kubectl get configmap -l app=openfero -o yaml > openfero-configmaps-backup.yaml
-   ```
-
-2. **Convert ConfigMap to Operarius**:
-
-   ```bash
-   # Use the conversion examples in docs/operarius-crd-migration.md
-   ```
-
-3. **Test new operarius**:
-
-   ```bash
-   kubectl apply -f new-operarius.yaml
-   kubectl get operarius
-   ```
-
-4. **Enable CRD mode in OpenFero**
-
-5. **Remove old ConfigMaps after verification**
-
-### ConfigMap vs Operarius Comparison
-
-| Feature           | ConfigMap | Operarius CRD              |
-| ----------------- | --------- | -------------------------- |
-| Schema validation | None      | Full Kubernetes Job schema |
-| IDE support       | Limited   | Full autocompletion        |
-| Priority handling | None      | Built-in priority system   |
 | Deduplication     | Manual    | Automatic                  |
 | Status tracking   | None      | Comprehensive status       |
 | kubectl explain   | No        | Yes                        |

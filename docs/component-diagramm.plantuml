@@ -8,8 +8,8 @@ package "OpenFero" {
 }
 
 node "Kubernetes" {
-  [OpenFero] ..> [Kubernetes API] : read Job definition from ConfigMap
-  [OpenFero] ..> [Kubernetes API] : create Job from ConfigMap
+  [OpenFero] ..> [Kubernetes API] : read Job definition from Operarius CRD
+  [OpenFero] ..> [Kubernetes API] : create Job from Operarius CRD
   [Kubernetes API] ..> [Kubelet] : run Job
 }
 @enduml

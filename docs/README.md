@@ -1,6 +1,6 @@
 # How does OpenFero work?
 
-The following is an example of how OpenFero creates a Kubernetes job based on the alert received and the job definition from the configmap.
+The following is an example of how OpenFero creates a Kubernetes job based on the alert received and the job definition from the Operarius CRD.
 
 This should help you to better understand the behavior of OpenFero.
 
@@ -65,39 +65,32 @@ Below is the alert that was sent to OpenFero.
 }
 ```
 
-In combination with the following Operarios configuration...
+In combination with the following Operarius configuration...
 
 ```yaml
----
-apiVersion: v1
-kind: ConfigMap
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
 metadata:
-  name: openfero-kubequotaalmostfull-firing
-  labels:
-    app: openfero
-data:
-  KubeQuotaAlmostFull: |-
-    apiVersion: batch/v1
-    kind: Job
-    metadata:
-      name: openfero-kubequotaalmostfull-firing
-      labels:
-        app: openfero
+  name: kubequotaalmostfull-firing
+  namespace: openfero
+spec:
+  alertSelector:
+    alertname: KubeQuotaAlmostFull
+    status: firing
+  jobTemplate:
     spec:
       parallelism: 1
       completions: 1
       template:
-          labels:
-            app: openfero
-          spec:
-            containers:
-            - name: python-job
-              image: ubuntu:latest
-              args:
-              - bash
-              - -c
-              - |-
-                echo "Hallo Welt"
+        spec:
+          containers:
+          - name: python-job
+            image: ubuntu:latest
+            args:
+            - bash
+            - -c
+            - |-
+              echo "Hallo Welt"
             imagePullPolicy: Always
             restartPolicy: Never
 ```
@@ -106,28 +99,28 @@ Openfero would deploy a job as follows:
 
 ```yaml
 ---
-apiVersion: v1
-kind: ConfigMap
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
 metadata:
-  name: openfero-kubequotaalmostfull-firing
-  labels:
-    app: openfero
-data:
-  KubeQuotaAlmostFull: |-
-    apiVersion: batch/v1
-    kind: Job
+  name: kubequotaalmostfull-firing
+  namespace: openfero
+spec:
+  alertSelector:
+    alertname: KubeQuotaAlmostFull
+    status: firing
+  jobTemplate:
     metadata:
-      name: openfero-kubequotaalmostfull-firing
       labels:
         app: openfero
     spec:
       parallelism: 1
       completions: 1
       template:
+        metadata:
           labels:
             app: openfero
-          spec:
-            containers:
+        spec:
+          containers:
             - name: python-job
               image: ubuntu:latest
               args:

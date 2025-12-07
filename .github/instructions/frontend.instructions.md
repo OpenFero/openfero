@@ -73,7 +73,9 @@ const alertsStore = useAlertsStore();
 const searchQuery = ref("");
 
 const filteredAlerts = computed(() =>
-  alertsStore.alerts.filter((a) => a.labels.alertname.includes(searchQuery.value))
+  alertsStore.alerts.filter((a) =>
+    a.labels.alertname.includes(searchQuery.value)
+  )
 );
 
 onMounted(() => {
@@ -96,7 +98,9 @@ export const useAlertsStore = defineStore("alerts", () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
-  const firingAlerts = computed(() => alerts.value.filter((a) => a.status === "firing"));
+  const firingAlerts = computed(() =>
+    alerts.value.filter((a) => a.status === "firing")
+  );
 
   async function fetch(query?: string) {
     isLoading.value = true;
@@ -211,7 +215,7 @@ export interface Alert {
 }
 
 export interface JobInfo {
-  configMapName: string;
+  operariusName: string;
   jobName: string;
   image: string;
   status?: "pending" | "running" | "succeeded" | "failed";

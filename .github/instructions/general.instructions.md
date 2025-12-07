@@ -6,7 +6,7 @@ applyTo: "**"
 
 ## Project Overview
 
-OpenFero is a Kubernetes-native self-healing framework that receives Alertmanager webhooks and executes remediation Jobs defined in ConfigMaps (or Operarius CRDs). It acts as a bridge between Prometheus/Alertmanager and Kubernetes Jobs.
+OpenFero is a Kubernetes-native self-healing framework that receives Alertmanager webhooks and executes remediation Jobs defined in Operarius CRDs. It acts as a bridge between Prometheus/Alertmanager and Kubernetes Jobs.
 
 **Tech Stack**:
 
@@ -18,14 +18,14 @@ OpenFero is a Kubernetes-native self-healing framework that receives Alertmanage
 **Architecture Flow**:
 
 ```text
-Alertmanager webhook → OpenFero /api/alerts → ConfigMap/Operarius lookup → K8s Job creation → SSE broadcast → Vue.js UI update
+Alertmanager webhook → OpenFero /api/alerts → Operarius lookup → K8s Job creation → SSE broadcast → Vue.js UI update
 ```
 
 ## Critical Naming Conventions
 
-### ConfigMap Naming Pattern
+### Operarius Naming Pattern
 
-ConfigMaps MUST follow this exact format:
+Operarius CRDs MUST follow this exact format:
 
 ```text
 openfero-<alertname>-<status>
@@ -76,7 +76,7 @@ openfero-<alertname>-<status>
 
 ## Questions to Ask When Making Changes
 
-- Does this change affect ConfigMap naming? (Breaking change!)
+- Does this change affect Operarius naming? (Breaking change!)
 - Do Jobs need new labels or env vars? (Update `kubernetes/jobs.go`)
 - Is authentication involved? (Test with all auth methods: basic, bearer, none)
 - Does this add new metrics? (Register in `metadata.go`)

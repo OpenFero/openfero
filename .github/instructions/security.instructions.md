@@ -88,10 +88,10 @@ OpenFero supports multiple auth methods for the `/api/alerts` endpoint:
 Minimal permissions in Helm chart:
 
 ```yaml
-# Role for reading ConfigMaps (Operarii)
+# Role for reading Operarius CRDs
 rules:
-  - apiGroups: [""]
-    resources: ["configmaps"]
+  - apiGroups: ["openfero.io"]
+    resources: ["operarius"]
     verbs: ["get", "list", "watch"]
 
 # Role for creating Jobs

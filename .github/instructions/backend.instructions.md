@@ -10,34 +10,34 @@ applyTo: "**/*.go,go.mod,go.sum"
 
 1. **Webhook Reception**: `pkg/handlers/alerts.go:AlertsPostHandler()` receives Alertmanager JSON
 2. **Status Validation**: Only `firing` and `resolved` statuses are processed
-3. **ConfigMap Lookup**: `openfero-<alertname>-<status>` from ConfigMapStore (in-memory cache via Informer)
-4. **Job Creation**: `pkg/kubernetes/jobs.go:CreateRemediationJob()` creates Job in destination namespace
+3. **Operarius Lookup**: Find matching Operarius CRD based on alert labels
+4. **Job Creation**: `pkg/services/operarius.go:CreateJobFromOperarius()` creates Job in destination namespace
 5. **Alert Storage**: Saved to AlertStore (memory or memberlist) with JobInfo metadata
 6. **SSE Broadcast**: Notify connected frontend clients of new alerts/job status
 
 ### Kubernetes Client Architecture
 
-- **Informers**: ConfigMap and Job informers watch resources with label selectors
-- **Stores**: In-memory caches (`ConfigMapStore`, `JobStore`) for fast lookups
-- **Namespace separation**: `configmapNamespace` (operarios definitions) vs `jobDestinationNamespace` (where Jobs run)
+- **Informers**: Operarius and Job informers watch resources with label selectors
+- **Stores**: In-memory caches (`OperariusStore`, `JobStore`) for fast lookups
+- **Namespace separation**: `operariusNamespace` (operarios definitions) vs `jobDestinationNamespace` (where Jobs run)
 
 ### Error Handling & Logging
 
 - Use `go.uber.org/zap` structured logging exclusively
 - Pattern: `log.Error("message", zap.String("key", value), zap.Error(err))`
-- Always log alertname, status, configmap name, and job name for traceability
+- Always log alertname, status, operarius name, and job name for traceability
 
 ## API Endpoints
 
 ### JSON API (for Vue.js Frontend)
 
-| Method | Path            | Description                             |
-| ------ | --------------- | --------------------------------------- |
-| GET    | `/api/alerts`   | List alerts with optional `?q=` search  |
-| POST   | `/api/alerts`   | Receive Alertmanager webhook            |
-| GET    | `/api/jobs`     | List job definitions from ConfigMaps    |
-| GET    | `/api/workflow` | Get workflow data (alerts + job status) |
-| GET    | `/api/events`   | SSE endpoint for realtime updates       |
+| Method | Path            | Description                              |
+| ------ | --------------- | ---------------------------------------- |
+| GET    | `/api/alerts`   | List alerts with optional `?q=` search   |
+| POST   | `/api/alerts`   | Receive Alertmanager webhook             |
+| GET    | `/api/jobs`     | List job definitions from Operarius CRDs |
+| GET    | `/api/workflow` | Get workflow data (alerts + job status)  |
+| GET    | `/api/events`   | SSE endpoint for realtime updates        |
 
 ### System Endpoints
 
@@ -145,11 +145,11 @@ Implement `pkg/alertstore/alertstore.go:Store` interface:
 
 ## Troubleshooting
 
-### "ConfigMap not found"
+### "Operarius not found"
 
 - Check naming: `openfero-<alertname>-{firing|resolved}`
-- Verify ConfigMap has correct label selector (matches OpenFero's `--labelSelector`)
-- Check namespace: ConfigMaps must be in `--configmapNamespace`
+- Verify Operarius has correct label selector (matches OpenFero's `--labelSelector`)
+- Check namespace: Operarius must be in `--operariusNamespace`
 
 ### "Job already exists for group"
 
