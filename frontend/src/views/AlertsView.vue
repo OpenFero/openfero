@@ -1,79 +1,75 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { AlertCard } from '@/components'
-import { useWebSocket } from '@/composables'
-import { useAlertsStore } from '@/stores'
+import { useAlertsStore, useSocketStore } from '@/stores'
 
 const alertsStore = useAlertsStore()
+const socketStore = useSocketStore()
 const searchQuery = ref('')
 const expandedAlerts = ref<Set<number>>(new Set([0])) // First alert expanded by default
 
-// WebSocket connection for real-time updates
-const { connect, isConnected } = useWebSocket('/api/ws', {
-  onMessage: (message) => {
-    if (message.type === 'alert') {
-      // Refresh alerts when a new alert is received
-      alertsStore.fetch()
-    }
-  },
-  onConnect: () => {
-    console.log('WebSocket connected, fetching initial alerts')
-  },
+// Listen for real-time updates
+let removeListener: (() => void) | null = null
+
+onMounted(() => {
+    alertsStore.fetch()
+    removeListener = socketStore.addListener((message) => {
+        if (message.type === 'alert') {
+            alertsStore.fetch()
+        }
+    })
+})
+
+onUnmounted(() => {
+    if (removeListener) removeListener()
 })
 
 // Filtered alerts based on search
 const filteredAlerts = computed(() => {
-  if (!searchQuery.value.trim()) {
-    return alertsStore.alerts
-  }
+    if (!searchQuery.value.trim()) {
+        return alertsStore.alerts
+    }
 
-  const query = searchQuery.value.toLowerCase()
-  return alertsStore.alerts.filter((entry) => {
-    const alertName = entry.alert.labels.alertname?.toLowerCase() || ''
-    const status = entry.status.toLowerCase()
+    const query = searchQuery.value.toLowerCase()
+    return alertsStore.alerts.filter((entry) => {
+        const alertName = entry.alert.labels.alertname?.toLowerCase() || ''
+        const status = entry.status.toLowerCase()
 
-    // Search in labels
-    const labelsMatch = Object.entries(entry.alert.labels).some(
-      ([key, value]) =>
-        key.toLowerCase().includes(query) || String(value).toLowerCase().includes(query),
-    )
+        // Search in labels
+        const labelsMatch = Object.entries(entry.alert.labels).some(
+            ([key, value]) =>
+                key.toLowerCase().includes(query) || String(value).toLowerCase().includes(query),
+        )
 
-    // Search in annotations
-    const annotationsMatch = Object.entries(entry.alert.annotations || {}).some(
-      ([key, value]) =>
-        key.toLowerCase().includes(query) || String(value).toLowerCase().includes(query),
-    )
+        // Search in annotations
+        const annotationsMatch = Object.entries(entry.alert.annotations || {}).some(
+            ([key, value]) =>
+                key.toLowerCase().includes(query) || String(value).toLowerCase().includes(query),
+        )
 
-    return alertName.includes(query) || status.includes(query) || labelsMatch || annotationsMatch
-  })
+        return alertName.includes(query) || status.includes(query) || labelsMatch || annotationsMatch
+    })
 })
 
 const toggleAlert = (index: number) => {
-  if (expandedAlerts.value.has(index)) {
-    expandedAlerts.value.delete(index)
-  } else {
-    expandedAlerts.value.add(index)
-  }
+    if (expandedAlerts.value.has(index)) {
+        expandedAlerts.value.delete(index)
+    } else {
+        expandedAlerts.value.add(index)
+    }
 }
 
 const isExpanded = (index: number) => expandedAlerts.value.has(index)
 
 const expandAll = () => {
-  filteredAlerts.value.forEach((_, index) => {
-    expandedAlerts.value.add(index)
-  })
+    filteredAlerts.value.forEach((_, index) => {
+        expandedAlerts.value.add(index)
+    })
 }
 
 const collapseAll = () => {
-  expandedAlerts.value.clear()
+    expandedAlerts.value.clear()
 }
-
-onMounted(() => {
-  alertsStore.fetch()
-  connect()
-})
-
-// Note: disconnect is handled automatically by useWebSocket's onUnmounted
 </script>
 
 <template>
@@ -101,13 +97,6 @@ onMounted(() => {
                 </div>
             </div>
             <div class="flex items-center gap-3">
-                <span class="status-indicator">
-                    <span :class="isConnected ? 'status-live' : 'status-disconnected'" class="status-dot"></span>
-                    <span
-                        :class="isConnected ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
-                        {{ isConnected ? 'Live' : 'Disconnected' }}
-                    </span>
-                </span>
                 <div class="flex gap-1">
                     <button class="btn btn-secondary btn-sm" @click="expandAll">
                         <svg class="w-4 h-4 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">

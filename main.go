@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	operariusv1alpha1 "github.com/OpenFero/openfero/api/v1alpha1"
 	_ "github.com/OpenFero/openfero/pkg/docs"
 	"github.com/OpenFero/openfero/pkg/handlers"
 	"github.com/OpenFero/openfero/pkg/kubernetes"
@@ -255,6 +256,12 @@ func main() {
 	wsHub := handlers.GetWSHub()
 	services.SetAlertBroadcaster(func(entry models.AlertStoreEntry) {
 		wsHub.Broadcast("alert", entry)
+	})
+
+	// Set Operarius broadcaster
+	operariusService.SetBroadcaster(func(op operariusv1alpha1.Operarius) {
+		jobInfo := operariusService.ToJobInfo(op)
+		wsHub.Broadcast("operarius_update", jobInfo)
 	})
 
 	// Register metrics and set prometheus handler

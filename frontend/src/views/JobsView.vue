@@ -1,13 +1,26 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { JobTable } from '@/components'
-import { useJobsStore } from '@/stores'
+import { useJobsStore, useSocketStore } from '@/stores'
+import type { JobInfo } from '@/types'
 
 const jobsStore = useJobsStore()
+const socketStore = useSocketStore()
 const showLegend = ref(false)
+
+let removeListener: (() => void) | null = null
 
 onMounted(() => {
     jobsStore.fetch()
+    removeListener = socketStore.addListener((message) => {
+        if (message.type === 'operarius_update') {
+            jobsStore.updateJob(message.data as JobInfo)
+        }
+    })
+})
+
+onUnmounted(() => {
+    if (removeListener) removeListener()
 })
 </script>
 
