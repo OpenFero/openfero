@@ -122,7 +122,7 @@ const hasAnnotations = computed(() => {
                             <div>
                                 <strong class="text-gray-700 dark:text-gray-300">Job Name:</strong>
                                 <span class="ml-1 font-mono text-gray-600 dark:text-gray-400">{{ alert.jobInfo.jobName
-                                    }}</span>
+                                }}</span>
                             </div>
                             <div>
                                 <strong class="text-gray-700 dark:text-gray-300">Source:</strong>
@@ -137,7 +137,7 @@ const hasAnnotations = computed(() => {
                             <div>
                                 <strong class="text-gray-700 dark:text-gray-300">Image:</strong>
                                 <span class="ml-1 font-mono text-gray-600 dark:text-gray-400">{{ alert.jobInfo.image
-                                    }}</span>
+                                }}</span>
                             </div>
                         </div>
                     </div>

@@ -5,11 +5,11 @@ import { useTheme } from '@/composables/useTheme'
 import { useAppStore } from '@/stores/app'
 
 defineProps<{
-  showSearch?: boolean
+    showSearch?: boolean
 }>()
 
 const emit = defineEmits<{
-  search: [query: string]
+    search: [query: string]
 }>()
 
 const route = useRoute()
@@ -21,30 +21,30 @@ const showAboutModal = ref(false)
 const mobileMenuOpen = ref(false)
 
 function handleSearch(event: Event) {
-  const target = event.target as HTMLInputElement
-  emit('search', target.value)
+    const target = event.target as HTMLInputElement
+    emit('search', target.value)
 }
 
 function openAboutModal() {
-  showAboutModal.value = true
-  if (!appStore.buildInfo) {
-    appStore.fetchInfo()
-  }
+    showAboutModal.value = true
+    if (!appStore.buildInfo) {
+        appStore.fetchInfo()
+    }
 }
 
 function closeAboutModal() {
-  showAboutModal.value = false
+    showAboutModal.value = false
 }
 
 // Close modal on escape key
 function handleEscape(event: KeyboardEvent) {
-  if (event.key === 'Escape' && showAboutModal.value) {
-    closeAboutModal()
-  }
+    if (event.key === 'Escape' && showAboutModal.value) {
+        closeAboutModal()
+    }
 }
 
 onMounted(() => {
-  document.addEventListener('keydown', handleEscape)
+    document.addEventListener('keydown', handleEscape)
 })
 </script>
 
@@ -189,10 +189,10 @@ onMounted(() => {
                     <dl v-else-if="appStore.buildInfo" class="grid grid-cols-3 gap-y-2 text-sm">
                         <dt class="font-medium text-gray-900 dark:text-gray-200">Version</dt>
                         <dd class="col-span-2 font-mono text-gray-600 dark:text-gray-400">{{ appStore.buildInfo.version
-                        }}</dd>
+                            }}</dd>
                         <dt class="font-medium text-gray-900 dark:text-gray-200">Commit</dt>
                         <dd class="col-span-2 font-mono text-gray-600 dark:text-gray-400">{{ appStore.buildInfo.commit
-                        }}</dd>
+                            }}</dd>
                         <dt class="font-medium text-gray-900 dark:text-gray-200">Build Date</dt>
                         <dd class="col-span-2 font-mono text-gray-600 dark:text-gray-400">{{
                             appStore.buildInfo.buildDate }}</dd>
