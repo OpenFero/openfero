@@ -127,7 +127,7 @@ func (s *Server) handleOperariusBasedJobs(ctx context.Context, hookMessage model
 				jobInfo = &alertstore.JobInfo{
 					JobName:             "N/A (Deduplicated)",
 					Namespace:           operarius.Namespace,
-					ConfigMapName:       operarius.Name,
+					OperariusName:       operarius.Name,
 					Image:               "N/A",
 					ExecutionCount:      operarius.Status.ExecutionCount,
 					LastExecutionTime:   lastExecutionTime,
@@ -169,7 +169,7 @@ func (s *Server) handleOperariusBasedJobs(ctx context.Context, hookMessage model
 					jobInfo = &alertstore.JobInfo{
 						JobName:             job.Name,
 						Namespace:           job.Namespace,
-						ConfigMapName:       operarius.Name, // Operarius name for tracking
+						OperariusName:       operarius.Name, // Operarius name for tracking
 						Image:               getFirstContainerImage(job),
 						ExecutionCount:      operarius.Status.ExecutionCount,
 						LastExecutionTime:   lastExecutionTime,

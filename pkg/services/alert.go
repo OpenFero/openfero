@@ -27,7 +27,7 @@ func broadcastAlert(alert models.Alert, status string, jobInfo *alertstore.JobIn
 		}
 		if jobInfo != nil {
 			entry.JobInfo = &models.JobInfo{
-				ConfigMapName: jobInfo.ConfigMapName,
+				OperariusName: jobInfo.OperariusName,
 				JobName:       jobInfo.JobName,
 				Image:         jobInfo.Image,
 			}

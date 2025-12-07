@@ -46,7 +46,7 @@ func (s *Server) JobsAPIHandler(w http.ResponseWriter, r *http.Request) {
 				}
 
 				jobInfos = append(jobInfos, models.JobInfo{
-					ConfigMapName:       op.Name,
+					OperariusName:       op.Name,
 					JobName:             op.Spec.AlertSelector.AlertName, // Use AlertName as JobName for display
 					Namespace:           op.Namespace,
 					Image:               image,

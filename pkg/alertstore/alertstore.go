@@ -22,7 +22,7 @@ type Alert struct {
 
 // JobInfo contains information about a triggered job
 type JobInfo struct {
-	ConfigMapName       string     `json:"configMapName,omitempty"`
+	OperariusName       string     `json:"operariusName,omitempty"`
 	JobName             string     `json:"jobName,omitempty"`
 	Namespace           string     `json:"namespace,omitempty"`
 	Image               string     `json:"image,omitempty"`

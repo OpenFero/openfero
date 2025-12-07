@@ -50,8 +50,8 @@ type AlertStoreEntry struct {
 
 // JobInfo contains information about job definitions
 type JobInfo struct {
-	// Name of the ConfigMap containing the job definition
-	ConfigMapName string `json:"configMapName"`
+	// Name of the Operarius containing the job definition
+	OperariusName string `json:"operariusName"`
 	// Name of the job
 	JobName string `json:"jobName"`
 	// Namespace of the job

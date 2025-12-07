@@ -287,7 +287,7 @@ func (s *MemberlistStore) alertMatchesQuery(entry alertEntry, query string) bool
 
 	// Check job info if present
 	if entry.JobInfo != nil {
-		if strings.Contains(strings.ToLower(entry.JobInfo.ConfigMapName), query) ||
+		if strings.Contains(strings.ToLower(entry.JobInfo.OperariusName), query) ||
 			strings.Contains(strings.ToLower(entry.JobInfo.JobName), query) ||
 			strings.Contains(strings.ToLower(entry.JobInfo.Image), query) {
 			return true

@@ -127,7 +127,7 @@ const hasAnnotations = computed(() => {
                             <div>
                                 <strong class="text-gray-700 dark:text-gray-300">Source:</strong>
                                 <span class="ml-1 font-mono text-gray-600 dark:text-gray-400">{{
-                                    alert.jobInfo.configMapName }}</span>
+                                    alert.jobInfo.operariusName }}</span>
                             </div>
                             <div>
                                 <strong class="text-gray-700 dark:text-gray-300">Status:</strong>
