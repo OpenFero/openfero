@@ -9,7 +9,7 @@ An **Operarios** (Latin for "worker") is a container image designed to execute r
 ## Table of Contents
 
 - [Quick Start](#quick-start)
-- [ConfigMap Requirements](#configmap-requirements)
+- [Operarius CRD Requirements](#operarius-crd-requirements)
 - [Environment Variables](#environment-variables)
 - [Exit Codes](#exit-codes)
 - [Best Practices](#best-practices)
@@ -21,20 +21,16 @@ An **Operarios** (Latin for "worker") is a container image designed to execute r
 ### Minimal Example
 
 ```yaml
-apiVersion: v1
-kind: ConfigMap
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
 metadata:
-  name: openfero-diskspacelow-firing
-  labels:
-    app: openfero
-data:
-  DiskSpaceLow: |-
-    apiVersion: batch/v1
-    kind: Job
-    metadata:
-      name: cleanup-disk-space
-      labels:
-        app: openfero
+  name: disk-cleanup
+  namespace: openfero
+spec:
+  alertSelector:
+    alertname: DiskSpaceLow
+    status: firing
+  jobTemplate:
     spec:
       template:
         spec:
@@ -47,51 +43,54 @@ data:
           restartPolicy: Never
 ```
 
-## ConfigMap Requirements
+## Operarius CRD Requirements
 
 ### Naming Convention
 
-ConfigMaps **MUST** follow this exact pattern:
+While Operarius CRDs can have any name, it is recommended to follow a descriptive pattern:
 
 ```text
-openfero-<alertname>-<status>
+<alertname>-<status>
 ```
-
-- `<alertname>`: The alert name from Prometheus (case-sensitive, sanitized)
-- `<status>`: Either `firing` or `resolved`
 
 **Examples:**
 
-- `openfero-DiskSpaceLow-firing`
-- `openfero-KubeQuotaAlmostFull-resolved`
-- `openfero-PodCrashLooping-firing`
+- `diskspacelow-firing`
+- `kubequotaalmostfull-resolved`
+- `podcrashlooping-firing`
 
-### Required Labels
+### Alert Selector
 
-ConfigMaps must include labels matching OpenFero's `--labelSelector` flag:
+The `alertSelector` field is **mandatory** and determines which alerts trigger this Operarius:
 
 ```yaml
-metadata:
-  labels:
-    app: openfero  # Default selector
+spec:
+  alertSelector:
+    alertname: DiskSpaceLow  # Must match Prometheus alert name exactly
+    status: firing           # Either 'firing' or 'resolved'
+    labels:                  # Optional: Match specific alert labels
+      severity: critical
 ```
 
-### Job Definition Structure
+### Job Template
 
-The ConfigMap data must contain a key matching the alert name with a complete Kubernetes Job definition in YAML format:
+The `jobTemplate` field embeds a standard Kubernetes `JobTemplateSpec`. This means you can use any feature available in standard Kubernetes Jobs:
+
+- `initContainers`
+- `volumes` / `volumeMounts`
+- `serviceAccountName`
+- `securityContext`
+- `resources` (requests/limits)
+- `affinity` / `tolerations`
 
 ```yaml
-data:
-  AlertName: |-
-    apiVersion: batch/v1
-    kind: Job
-    metadata:
-      name: job-name
-      labels:
-        app: openfero
+spec:
+  jobTemplate:
     spec:
+      ttlSecondsAfterFinished: 3600  # Auto-cleanup
       template:
         spec:
+          serviceAccountName: remediation-sa
           containers:
           - name: worker
             image: your-image:tag
@@ -165,20 +164,22 @@ instance := os.Getenv("OPENFERO_INSTANCE")
 
 ### Custom Environment Variables
 
-You can define additional environment variables in your ConfigMap:
+You can define additional environment variables in your Operarius CRD:
 
 ```yaml
 spec:
-  template:
+  jobTemplate:
     spec:
-      containers:
-      - name: worker
-        image: your-image:tag
-        env:
-        - name: CUSTOM_SETTING
-          value: "my-value"
-        - name: DRY_RUN
-          value: "false"
+      template:
+        spec:
+          containers:
+          - name: worker
+            image: your-image:tag
+            env:
+            - name: CUSTOM_SETTING
+              value: "my-value"
+            - name: DRY_RUN
+              value: "false"
 ```
 
 ## Exit Codes
@@ -289,12 +290,14 @@ Set reasonable timeouts to prevent hung jobs:
 
 ```yaml
 spec:
-  template:
+  jobTemplate:
     spec:
       activeDeadlineSeconds: 600  # 10 minute timeout
-      containers:
-      - name: worker
-        image: your-image:tag
+      template:
+        spec:
+          containers:
+          - name: worker
+            image: your-image:tag
 ```
 
 ### 4. Resource Limits
@@ -303,18 +306,20 @@ Always define resource requests and limits:
 
 ```yaml
 spec:
-  template:
+  jobTemplate:
     spec:
-      containers:
-      - name: worker
-        image: your-image:tag
-        resources:
-          requests:
-            memory: "128Mi"
-            cpu: "100m"
-          limits:
-            memory: "256Mi"
-            cpu: "500m"
+      template:
+        spec:
+          containers:
+          - name: worker
+            image: your-image:tag
+            resources:
+              requests:
+                memory: "128Mi"
+                cpu: "100m"
+              limits:
+                memory: "256Mi"
+                cpu: "500m"
 ```
 
 ### 5. Security
@@ -323,30 +328,34 @@ Follow security best practices:
 
 ```yaml
 spec:
-  template:
+  jobTemplate:
     spec:
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
-        fsGroup: 1000
-      containers:
-      - name: worker
-        image: your-image:tag
-        securityContext:
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          capabilities:
-            drop:
-            - ALL
+      template:
+        spec:
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+          containers:
+          - name: worker
+            image: your-image:tag
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                - ALL
 ```
 
 ### 6. Job TTL
 
-OpenFero automatically adds a TTL (default: 300 seconds) to jobs. You can override this in your ConfigMap:
+OpenFero automatically adds a TTL (default: 300 seconds) to jobs. You can override this in your Operarius CRD:
 
 ```yaml
 spec:
-  ttlSecondsAfterFinished: 60  # Cleanup 60s after completion
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 60  # Cleanup 60s after completion
 ```
 
 ### 7. Retry Policy
@@ -355,10 +364,12 @@ Configure appropriate retry behavior:
 
 ```yaml
 spec:
-  backoffLimit: 3  # Retry up to 3 times
-  template:
+  jobTemplate:
     spec:
-      restartPolicy: Never  # Required for Jobs
+      backoffLimit: 3  # Retry up to 3 times
+      template:
+        spec:
+          restartPolicy: Never  # Required for Jobs
 ```
 
 ## Example Implementations
@@ -653,13 +664,13 @@ def remediate():
 
 ### Job Not Created
 
-**Check ConfigMap naming:**
+**Check Operarius CRD:**
 
 ```bash
-kubectl get configmap -l app=openfero
+kubectl get operarius -n openfero
 ```
 
-Should show: `openfero-<alertname>-{firing|resolved}`
+Verify that an Operarius exists with an `alertSelector` matching your alert.
 
 ### Environment Variables Missing
 
@@ -687,7 +698,7 @@ Look for: `"Adding labels as environment variables"`
 
 - [OpenFero Documentation](../README.md)
 - [Kubernetes Jobs Documentation](https://kubernetes.io/docs/concepts/workloads/controllers/job/)
-- [Example ConfigMaps](./examples/)
+- [Example Operarius CRDs](./examples/)
 - [Authentication Guide](./authentication.md)
 
 ## Contributing
@@ -695,7 +706,7 @@ Look for: `"Adding labels as environment variables"`
 Have you built an Operarios that others might find useful? Consider contributing it to the community:
 
 1. Document your use case
-2. Include a Dockerfile and example ConfigMap
+2. Include a Dockerfile and example Operarius CRD
 3. Open a pull request to the `operarios/` directory
 
 ## Questions?

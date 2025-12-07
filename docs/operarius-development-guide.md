@@ -48,17 +48,12 @@ The service layer handles:
 Extends existing alert handlers with operarius support:
 
 ```go
-if s.OperariusService != nil && s.UseOperariusCRDs {
-    // Try CRD-based approach first
+if s.OperariusService != nil {
+    // Try CRD-based approach
     if handled, err := s.handleWithOperarius(ctx, hookMessage); err != nil {
         logger.Error("Failed to handle alert with operarius", "error", err)
-    } else if handled {
-        return
     }
 }
-
-// Fallback to ConfigMap approach
-s.handleWithConfigMap(ctx, hookMessage)
 ```
 
 ## Development Workflow

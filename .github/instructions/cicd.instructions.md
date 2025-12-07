@@ -251,7 +251,7 @@ updates:
 cd frontend && npm run dev
 
 # Run Go backend (separate terminal)
-go run . --configmapNamespace=default
+go run . --operariusNamespace=default
 
 # Or use goreleaser for production-like build
 goreleaser build --snapshot --clean --single-target
