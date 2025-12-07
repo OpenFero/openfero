@@ -4,13 +4,13 @@ import { useDateTime } from '@/composables/useDateTime'
 import type { AlertStoreEntry } from '@/types'
 
 const props = defineProps<{
-    alert: AlertStoreEntry
-    index: number
-    expanded?: boolean
+  alert: AlertStoreEntry
+  index: number
+  expanded?: boolean
 }>()
 
 const emit = defineEmits<{
-    toggle: [index: number]
+  toggle: [index: number]
 }>()
 
 const { formatDateTime, toISOString } = useDateTime()
@@ -18,35 +18,35 @@ const { formatDateTime, toISOString } = useDateTime()
 const uniqueId = computed(() => `alert-${props.index}`)
 
 const statusColors = computed(() => {
-    switch (props.alert.status) {
-        case 'firing':
-            return 'bg-red-600 hover:bg-red-700'
-        case 'resolved':
-            return 'bg-green-600 hover:bg-green-700'
-        default:
-            return 'bg-primary-600 hover:bg-primary-700'
-    }
+  switch (props.alert.status) {
+    case 'firing':
+      return 'bg-red-600 hover:bg-red-700'
+    case 'resolved':
+      return 'bg-green-600 hover:bg-green-700'
+    default:
+      return 'bg-primary-600 hover:bg-primary-700'
+  }
 })
 
 const alertName = computed(() => props.alert.alert.labels.alertname || 'Unknown Alert')
 
 const formattedTimestamp = computed(() => {
-    return formatDateTime(props.alert.timestamp, {
-        includeMilliseconds: true,
-        includeTimezone: true,
-    })
+  return formatDateTime(props.alert.timestamp, {
+    includeMilliseconds: true,
+    includeTimezone: true,
+  })
 })
 
 const isoTimestamp = computed(() => {
-    return toISOString(props.alert.timestamp)
+  return toISOString(props.alert.timestamp)
 })
 
 const hasLabels = computed(() => {
-    return props.alert.alert.labels && Object.keys(props.alert.alert.labels).length > 0
+  return props.alert.alert.labels && Object.keys(props.alert.alert.labels).length > 0
 })
 
 const hasAnnotations = computed(() => {
-    return props.alert.alert.annotations && Object.keys(props.alert.alert.annotations).length > 0
+  return props.alert.alert.annotations && Object.keys(props.alert.alert.annotations).length > 0
 })
 </script>
 

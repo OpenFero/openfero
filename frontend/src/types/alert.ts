@@ -3,13 +3,13 @@
  */
 export interface Alert {
   /** Key-value pairs of alert labels */
-  labels: Record<string, string>;
+  labels: Record<string, string>
   /** Key-value pairs of alert annotations */
-  annotations: Record<string, string>;
+  annotations: Record<string, string>
   /** Time when the alert started firing */
-  startsAt?: string;
+  startsAt?: string
   /** Time when the alert ended */
-  endsAt?: string;
+  endsAt?: string
 }
 
 /**
@@ -17,15 +17,15 @@ export interface Alert {
  */
 export interface JobCondition {
   /** Type of condition */
-  type: string;
+  type: string
   /** Status of the condition */
-  status: string;
+  status: string
   /** Last time the condition transitioned from one status to another */
-  lastTransitionTime: string;
+  lastTransitionTime: string
   /** Unique, one-word, CamelCase reason for the condition's last transition */
-  reason?: string;
+  reason?: string
   /** Human-readable message indicating details about last transition */
-  message?: string;
+  message?: string
 }
 
 /**
@@ -33,27 +33,27 @@ export interface JobCondition {
  */
 export interface JobInfo {
   /** Name of the Operarius containing the job definition */
-  operariusName: string;
+  operariusName: string
   /** Name of the job */
-  jobName: string;
+  jobName: string
   /** Namespace of the job */
-  namespace?: string;
+  namespace?: string
   /** Container image used by the job */
-  image: string;
+  image: string
   /** Total number of jobs created from this Operarius */
-  executionCount?: number;
+  executionCount?: number
   /** Last time a job was created from this Operarius */
-  lastExecutionTime?: string;
+  lastExecutionTime?: string
   /** Name of the last job created */
-  lastExecutedJobName?: string;
+  lastExecutedJobName?: string
   /** Latest available observations of an Operarius's state */
-  conditions?: JobCondition[];
+  conditions?: JobCondition[]
   /** Job execution status */
-  status?: string;
+  status?: string
   /** Time when the job started */
-  startedAt?: string;
+  startedAt?: string
   /** Time when the job completed */
-  completedAt?: string;
+  completedAt?: string
 }
 
 /**
@@ -61,13 +61,13 @@ export interface JobInfo {
  */
 export interface AlertStoreEntry {
   /** The alert data */
-  alert: Alert;
+  alert: Alert
   /** Alert status: firing or resolved */
-  status: "firing" | "resolved";
+  status: 'firing' | 'resolved'
   /** Timestamp when the alert was stored */
-  timestamp: string;
+  timestamp: string
   /** Information about the triggered job, if any */
-  jobInfo?: JobInfo;
+  jobInfo?: JobInfo
 }
 
 /**
@@ -75,21 +75,21 @@ export interface AlertStoreEntry {
  */
 export interface HookMessage {
   /** Version of the Alertmanager message */
-  version: string;
+  version: string
   /** Key used to group alerts */
-  groupKey: string;
+  groupKey: string
   /** Status of the alert group */
-  status: "firing" | "resolved";
+  status: 'firing' | 'resolved'
   /** Name of the receiver that handled the alert */
-  receiver: string;
+  receiver: string
   /** Labels common to all alerts in the group */
-  groupLabels: Record<string, string>;
+  groupLabels: Record<string, string>
   /** Labels common across all alerts */
-  commonLabels: Record<string, string>;
+  commonLabels: Record<string, string>
   /** Annotations common across all alerts */
-  commonAnnotations: Record<string, string>;
+  commonAnnotations: Record<string, string>
   /** External URL to the Alertmanager */
-  externalURL: string;
+  externalURL: string
   /** List of alerts in the group */
-  alerts: Alert[];
+  alerts: Alert[]
 }

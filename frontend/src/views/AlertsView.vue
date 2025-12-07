@@ -12,63 +12,63 @@ const expandedAlerts = ref<Set<number>>(new Set([0])) // First alert expanded by
 let removeListener: (() => void) | null = null
 
 onMounted(() => {
-    alertsStore.fetch()
-    removeListener = socketStore.addListener((message) => {
-        if (message.type === 'alert') {
-            alertsStore.fetch()
-        }
-    })
+  alertsStore.fetch()
+  removeListener = socketStore.addListener((message) => {
+    if (message.type === 'alert') {
+      alertsStore.fetch()
+    }
+  })
 })
 
 onUnmounted(() => {
-    if (removeListener) removeListener()
+  if (removeListener) removeListener()
 })
 
 // Filtered alerts based on search
 const filteredAlerts = computed(() => {
-    if (!searchQuery.value.trim()) {
-        return alertsStore.alerts
-    }
+  if (!searchQuery.value.trim()) {
+    return alertsStore.alerts
+  }
 
-    const query = searchQuery.value.toLowerCase()
-    return alertsStore.alerts.filter((entry) => {
-        const alertName = entry.alert.labels.alertname?.toLowerCase() || ''
-        const status = entry.status.toLowerCase()
+  const query = searchQuery.value.toLowerCase()
+  return alertsStore.alerts.filter((entry) => {
+    const alertName = entry.alert.labels.alertname?.toLowerCase() || ''
+    const status = entry.status.toLowerCase()
 
-        // Search in labels
-        const labelsMatch = Object.entries(entry.alert.labels).some(
-            ([key, value]) =>
-                key.toLowerCase().includes(query) || String(value).toLowerCase().includes(query),
-        )
+    // Search in labels
+    const labelsMatch = Object.entries(entry.alert.labels).some(
+      ([key, value]) =>
+        key.toLowerCase().includes(query) || String(value).toLowerCase().includes(query),
+    )
 
-        // Search in annotations
-        const annotationsMatch = Object.entries(entry.alert.annotations || {}).some(
-            ([key, value]) =>
-                key.toLowerCase().includes(query) || String(value).toLowerCase().includes(query),
-        )
+    // Search in annotations
+    const annotationsMatch = Object.entries(entry.alert.annotations || {}).some(
+      ([key, value]) =>
+        key.toLowerCase().includes(query) || String(value).toLowerCase().includes(query),
+    )
 
-        return alertName.includes(query) || status.includes(query) || labelsMatch || annotationsMatch
-    })
+    return alertName.includes(query) || status.includes(query) || labelsMatch || annotationsMatch
+  })
 })
 
 const toggleAlert = (index: number) => {
-    if (expandedAlerts.value.has(index)) {
-        expandedAlerts.value.delete(index)
-    } else {
-        expandedAlerts.value.add(index)
-    }
+  if (expandedAlerts.value.has(index)) {
+    expandedAlerts.value.delete(index)
+  } else {
+    expandedAlerts.value.add(index)
+  }
 }
 
 const isExpanded = (index: number) => expandedAlerts.value.has(index)
 
 const expandAll = () => {
-    filteredAlerts.value.forEach((_, index) => {
-        expandedAlerts.value.add(index)
-    })
+  filteredAlerts.value.forEach((_, index) => {
+    expandedAlerts.value.add(index)
+  })
 }
 
 const collapseAll = () => {
-    expandedAlerts.value.clear()
+  expandedAlerts.value.clear()
 }
 </script>
 
