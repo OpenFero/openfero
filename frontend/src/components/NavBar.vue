@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useTheme } from '@/composables/useTheme'
 import { useAppStore } from '@/stores/app'
+import { useSocketStore } from '@/stores/socket'
 
 defineProps<{
     showSearch?: boolean
@@ -15,10 +16,19 @@ const emit = defineEmits<{
 const route = useRoute()
 const { theme, toggleTheme } = useTheme()
 const appStore = useAppStore()
+const socketStore = useSocketStore()
 
 const isDark = computed(() => theme.value === 'dark')
 const showAboutModal = ref(false)
 const mobileMenuOpen = ref(false)
+
+function handleToggleConnection() {
+    console.log('NavBar: Toggling connection. Current state:', {
+        isConnected: socketStore.isConnected,
+        isPaused: socketStore.isPaused
+    })
+    socketStore.toggleConnection()
+}
 
 function handleSearch(event: Event) {
     const target = event.target as HTMLInputElement
@@ -81,6 +91,21 @@ onMounted(() => {
         </div>
 
         <div class="flex items-center gap-2">
+            <!-- Connection Status -->
+            <button
+                class="hidden sm:flex items-center gap-2 mr-2 px-2 py-1 rounded-full bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 transition-colors cursor-pointer"
+                @click="handleToggleConnection()"
+                :title="socketStore.isConnected ? 'Click to disconnect' : 'Click to connect'">
+                <span :class="[
+                    socketStore.isConnected ? 'bg-green-500 animate-pulse' : (socketStore.isPaused ? 'bg-gray-400' : 'bg-red-500'),
+                    'w-2 h-2 rounded-full'
+                ]"></span>
+                <span class="text-xs font-medium"
+                    :class="socketStore.isConnected ? 'text-green-700 dark:text-green-400' : (socketStore.isPaused ? 'text-gray-600 dark:text-gray-400' : 'text-red-700 dark:text-red-400')">
+                    {{ socketStore.isConnected ? 'Live' : (socketStore.isPaused ? 'Paused' : 'Disconnected') }}
+                </span>
+            </button>
+
             <!-- Search input -->
             <div v-if="showSearch" class="relative hidden sm:block">
                 <input type="search" placeholder="Search..."
@@ -143,6 +168,18 @@ onMounted(() => {
                     Jobs
                 </RouterLink>
             </li>
+            <li>
+                <button
+                    class="w-full text-left px-3 py-2 rounded-md text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex items-center gap-2"
+                    @click="handleToggleConnection()">
+                    <span :class="[
+                        socketStore.isConnected ? 'bg-green-500 animate-pulse' : (socketStore.isPaused ? 'bg-gray-400' : 'bg-red-500'),
+                        'w-2 h-2 rounded-full'
+                    ]"></span>
+                    {{ socketStore.isConnected ? 'Live Connection' : (socketStore.isPaused ? 'Connection Paused' :
+                        'Disconnected') }}
+                </button>
+            </li>
         </ul>
         <div v-if="showSearch" class="mt-3">
             <input type="search" placeholder="Search..."
@@ -189,10 +226,10 @@ onMounted(() => {
                     <dl v-else-if="appStore.buildInfo" class="grid grid-cols-3 gap-y-2 text-sm">
                         <dt class="font-medium text-gray-900 dark:text-gray-200">Version</dt>
                         <dd class="col-span-2 font-mono text-gray-600 dark:text-gray-400">{{ appStore.buildInfo.version
-                            }}</dd>
+                        }}</dd>
                         <dt class="font-medium text-gray-900 dark:text-gray-200">Commit</dt>
                         <dd class="col-span-2 font-mono text-gray-600 dark:text-gray-400">{{ appStore.buildInfo.commit
-                            }}</dd>
+                        }}</dd>
                         <dt class="font-medium text-gray-900 dark:text-gray-200">Build Date</dt>
                         <dd class="col-span-2 font-mono text-gray-600 dark:text-gray-400">{{
                             appStore.buildInfo.buildDate }}</dd>

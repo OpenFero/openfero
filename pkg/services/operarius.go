@@ -32,10 +32,14 @@ type OperariusClientInterface interface {
 	GetNamespace() string
 }
 
+// OperariusBroadcaster is a function that broadcasts Operarius updates
+type OperariusBroadcaster func(operarius operariusv1alpha1.Operarius)
+
 // OperariusService handles Operarius CRD-based job creation
 type OperariusService struct {
 	kubeClient      kubernetes.Interface
 	operariusClient OperariusClientInterface
+	broadcaster     OperariusBroadcaster
 }
 
 // NewOperariusService creates a new OperariusService
@@ -60,6 +64,11 @@ func NewOperariusServiceWithK8sClient(kubeClient kubernetes.Interface, operarius
 		kubeClient:      kubeClient,
 		operariusClient: operariusClient,
 	}
+}
+
+// SetBroadcaster sets the broadcaster function
+func (s *OperariusService) SetBroadcaster(broadcaster OperariusBroadcaster) {
+	s.broadcaster = broadcaster
 }
 
 // FindMatchingOperarius finds the best matching Operarius for an alert from a webhook
@@ -404,6 +413,10 @@ func (s *OperariusService) UpdateOperariusStatus(ctx context.Context, operarius 
 		zap.String("jobName", jobName),
 		zap.Int32("executionCount", operarius.Status.ExecutionCount))
 
+	if s.broadcaster != nil {
+		s.broadcaster(*operarius)
+	}
+
 	return nil
 }
 
@@ -413,17 +426,30 @@ func (s *OperariusService) UpdateOperariusStatusFromJob(ctx context.Context, ope
 		return nil
 	}
 
-	// Only update for terminal states to avoid churn
+	// Determine status
 	var newStatus string
 	if job.Status.Succeeded > 0 {
 		newStatus = "Successful"
 	} else if job.Status.Failed > 0 {
 		newStatus = "Failed"
+	} else if job.Status.Active > 0 {
+		newStatus = "Running"
 	} else {
-		// Skip update for non-terminal states
+		newStatus = "Pending"
+	}
+
+	// If status is Running, we broadcast but don't persist to avoid churn
+	if newStatus == "Running" || newStatus == "Pending" {
+		if s.broadcaster != nil {
+			// Create a copy to avoid modifying the original if we were to persist later (though we don't here)
+			opCopy := operarius.DeepCopy()
+			opCopy.Status.LastExecutionStatus = newStatus
+			s.broadcaster(*opCopy)
+		}
 		return nil
 	}
 
+	// For terminal states, we persist
 	// Skip if status hasn't changed
 	if operarius.Status.LastExecutionStatus == newStatus {
 		return nil
@@ -441,6 +467,10 @@ func (s *OperariusService) UpdateOperariusStatusFromJob(ctx context.Context, ope
 		zap.String("job", job.Name),
 		zap.String("status", newStatus))
 
+	if s.broadcaster != nil {
+		s.broadcaster(*operarius)
+	}
+
 	return nil
 }
 
@@ -456,4 +486,29 @@ func (s *OperariusService) GetOperarius(ctx context.Context, name, namespace str
 	}
 
 	return s.operariusClient.Get(name)
+}
+
+// ToJobInfo converts an Operarius to a JobInfo model
+func (s *OperariusService) ToJobInfo(op operariusv1alpha1.Operarius) models.JobInfo {
+	image := "unknown"
+	if len(op.Spec.JobTemplate.Spec.Template.Spec.Containers) > 0 {
+		image = op.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
+	}
+
+	var lastExecutionTime *time.Time
+	if op.Status.LastExecutionTime != nil {
+		t := op.Status.LastExecutionTime.Time
+		lastExecutionTime = &t
+	}
+
+	return models.JobInfo{
+		OperariusName:       op.Name,
+		JobName:             op.Spec.AlertSelector.AlertName,
+		Namespace:           op.Namespace,
+		Image:               image,
+		ExecutionCount:      op.Status.ExecutionCount,
+		LastExecutionTime:   lastExecutionTime,
+		LastExecutedJobName: op.Status.LastExecutedJobName,
+		LastExecutionStatus: op.Status.LastExecutionStatus,
+	}
 }

@@ -3,15 +3,18 @@ import { onMounted } from 'vue'
 import { RouterView } from 'vue-router'
 import { NavBar } from '@/components'
 import { useTheme } from '@/composables'
-import { useAppStore } from '@/stores'
+import { useAppStore, useSocketStore } from '@/stores'
 
 // Initialize theme
 useTheme()
 
-// Load build info on mount
+// Load build info and connect socket on mount
 const appStore = useAppStore()
+const socketStore = useSocketStore()
+
 onMounted(() => {
   appStore.fetchInfo()
+  socketStore.connect()
 })
 </script>
 
