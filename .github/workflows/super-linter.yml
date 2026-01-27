@@ -59,17 +59,27 @@ jobs:
           VALIDATE_ALL_CODEBASE: false
           VALIDATE_CHECKOV: false
           VALIDATE_YAML: false
-          VALIDATE_JAVASCRIPT_STANDARD: false
           VALIDATE_GO: false
           VALIDATE_GO_MODULES: false # Go linting handled by go-tests.yml workflow
+          VALIDATE_JAVASCRIPT_ES: false # Disable ESLint in favor of Biome
           VALIDATE_JSX: false
+          VALIDATE_TSX: false # Disable ESLint in favor of Biome
+          VALIDATE_JSON: false # Disable ESLint/JSONLint in favor of Biome
           VALIDATE_CSS: false
           VALIDATE_CSS_PRETTIER: false
           VALIDATE_JAVASCRIPT_PRETTIER: false
+          VALIDATE_GRAPHQL_PRETTIER: false # Disable Prettier in favor of Biome
           VALIDATE_HTML: false
           VALIDATE_HTML_PRETTIER: false
           VALIDATE_JSON_PRETTIER: false
           VALIDATE_MARKDOWN_PRETTIER: false
+          # Disable Python linters as there is no Python code
+          VALIDATE_PYTHON_BLACK: false
+          VALIDATE_PYTHON_RUFF: false
+          VALIDATE_PYTHON_FLAKE8: false
+          VALIDATE_PYTHON_PYLINT: false
+          VALIDATE_PYTHON_ISORT: false
+          VALIDATE_PYTHON_MYPY: false
           # Disable TypeScript/Vue linting - handled by frontend-tests.yml workflow
           VALIDATE_TYPESCRIPT_ES: false
           VALIDATE_TYPESCRIPT_PRETTIER: false
