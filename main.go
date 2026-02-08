@@ -70,10 +70,7 @@ func validateAuthConfig(config handlers.AuthConfig) error {
 		}
 		return nil
 	case handlers.AuthMethodOAuth2:
-		if config.OAuth2Issuer == "" || config.OAuth2Audience == "" {
-			return fmt.Errorf("OAuth2 authentication requires both issuer and audience")
-		}
-		return nil
+		return fmt.Errorf("OAuth2 authentication is not yet implemented")
 	default:
 		return fmt.Errorf("unsupported authentication method: %s", config.Method)
 	}

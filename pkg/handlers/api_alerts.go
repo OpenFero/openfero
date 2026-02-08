@@ -35,13 +35,10 @@ type Server struct {
 // AlertsGetHandler handles GET requests to /alerts
 func (s *Server) AlertsGetHandler(w http.ResponseWriter, r *http.Request) {
 	// Alertmanager expects a 200 OK response, otherwise send_resolved will never work
-	enc := json.NewEncoder(w)
 	w.Header().Set(ContentTypeHeader, ApplicationJSONVal)
-	w.WriteHeader(http.StatusOK)
 
-	if err := enc.Encode("OK"); err != nil {
+	if err := json.NewEncoder(w).Encode("OK"); err != nil {
 		log.Error("error encoding messages: ", zap.String("error", err.Error()))
-		http.Error(w, "", http.StatusInternalServerError)
 	}
 }
 
@@ -92,9 +89,7 @@ func (s *Server) handleOperariusBasedJobs(ctx context.Context, hookMessage model
 
 	var jobInfo *alertstore.JobInfo
 
-	// Get all available Operarii (in a real implementation, you'd use a controller-runtime client)
-	// For now, this is a placeholder - you'll need to implement GetOperariiForNamespace
-	operarii, err := s.OperariusService.GetOperariiForNamespace(ctx, "openfero")
+	operarii, err := s.OperariusService.GetOperariiForNamespace(ctx, "")
 	if err != nil {
 		log.Error("Failed to get Operarii", zap.Error(err))
 		// Continue to store alert even if we can't get Operarii
@@ -143,8 +138,6 @@ func (s *Server) handleOperariusBasedJobs(ctx context.Context, hookMessage model
 						zap.String("operarius", operarius.Name))
 					metadata.JobsFailedTotal.Inc()
 				} else {
-					// Increment successful job creation metric
-					metadata.JobsCreatedTotal.Inc()
 
 					log.Info("Successfully created remediation job",
 						zap.String("jobName", job.Name),

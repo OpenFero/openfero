@@ -264,13 +264,13 @@ func TestValidateAuthConfig(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			name: "oauth2 valid",
+			name: "oauth2 not yet implemented",
 			config: handlers.AuthConfig{
 				Method:         handlers.AuthMethodOAuth2,
 				OAuth2Issuer:   "https://issuer.example.com",
 				OAuth2Audience: "openfero",
 			},
-			expectErr: false,
+			expectErr: true,
 		},
 		{
 			name: "oauth2 missing issuer",

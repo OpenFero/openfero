@@ -29,9 +29,14 @@ const (
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	// Allow all origins for development - in production, restrict this
 	CheckOrigin: func(r *http.Request) bool {
-		return true
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true // Allow non-browser clients (e.g. curl)
+		}
+		// Allow same-origin requests
+		host := r.Host
+		return origin == "http://"+host || origin == "https://"+host
 	},
 }
 
