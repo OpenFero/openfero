@@ -37,7 +37,7 @@ type Alert struct {
 	// Time when the alert started firing
 	StartsAt string `json:"startsAt,omitempty"`
 	// Time when the alert ended
-	EndsAt string `json:"EndsAt,omitempty"`
+	EndsAt string `json:"endsAt,omitempty"`
 }
 
 // AlertStoreEntry represents a stored alert with status and timestamp

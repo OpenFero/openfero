@@ -31,13 +31,13 @@ func TestGetAlertsHandler(t *testing.T) {
 }
 
 func TestSingleAlertPostAlertsHandler(t *testing.T) {
-	// Test implementation will be added later
+	t.Skip("TODO: Test implementation will be added later")
 }
 
-func MultipleAlertPostAlertsHandler(t *testing.T) {
-	// Test implementation will be added later
+func TestMultipleAlertPostAlertsHandler(t *testing.T) {
+	t.Skip("TODO: Test implementation will be added later")
 }
 
-func MalformedJSONPostAlertsHandler(t *testing.T) {
-	// Test implementation will be added later
+func TestMalformedJSONPostAlertsHandler(t *testing.T) {
+	t.Skip("TODO: Test implementation will be added later")
 }

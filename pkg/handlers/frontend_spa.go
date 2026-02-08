@@ -115,20 +115,3 @@ func hasFileExtension(urlPath string) bool {
 	}
 	return false
 }
-
-// LegacyUIRedirectHandler redirects old HTMX routes to the new SPA
-func LegacyUIRedirectHandler(w http.ResponseWriter, r *http.Request) {
-	// Map old routes to new Vue.js routes
-	newPath := r.URL.Path
-	switch r.URL.Path {
-	case "/":
-		newPath = "/"
-	case "/jobs":
-		newPath = "/jobs"
-	case "/about":
-		// About is now a modal in the navbar, redirect to home
-		newPath = "/"
-	}
-
-	http.Redirect(w, r, newPath, http.StatusTemporaryRedirect)
-}

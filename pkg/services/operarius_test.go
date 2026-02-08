@@ -713,7 +713,7 @@ func TestOperariusService_TemplateProcessing_EdgeCases(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:     "missing label returns no value placeholder",
+			name:     "missing label returns error with missingkey=error",
 			template: "{{ .Alert.Labels.missing }}",
 			templateData: struct {
 				Alert struct{ Labels map[string]string }
@@ -724,8 +724,8 @@ func TestOperariusService_TemplateProcessing_EdgeCases(t *testing.T) {
 					},
 				},
 			},
-			want:    "<no value>",
-			wantErr: false,
+			want:    "",
+			wantErr: true,
 		},
 		{
 			name:     "special characters in label value",

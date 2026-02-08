@@ -126,6 +126,10 @@ func getMetricsOptions(metric metrics.Description) prometheus.Opts {
 		return prometheus.Opts{}
 	}
 	nameTokens := strings.Split(tokens[len(tokens)-1], ":")
+	if len(nameTokens) < 2 {
+		log.Error("error getting metric options: invalid metric name format", zap.String("metric", metric.Name))
+		return prometheus.Opts{}
+	}
 	// create a unique name for metric, that will be its primary key on the registry
 	validName := normalizePrometheusName(strings.Join(nameTokens[:2], "_"))
 	subsystem := getMetricSubsystemName(metric)

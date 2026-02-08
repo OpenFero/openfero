@@ -311,7 +311,10 @@ func (s *OperariusService) processTemplate(templateStr string, data interface{})
 		return templateStr, nil
 	}
 
-	tmpl, err := template.New("operarius").Parse(templateStr)
+	tmpl, err := template.New("operarius").
+		Option("missingkey=error").
+		Funcs(template.FuncMap{}).
+		Parse(templateStr)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %w", err)
 	}
