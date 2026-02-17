@@ -203,6 +203,44 @@ migration-check: ## Check for ConfigMap-based operarios that need migration
 	@echo "Checking for existing ConfigMap-based operarios..."
 	@kubectl get configmap -l app=openfero -A || echo "No openfero ConfigMaps found"
 
+# Benchmark configuration
+BENCH_COUNT ?= 5
+BENCH_TIME ?= 5s
+BENCH_TIMEOUT ?= 30m
+BENCH_PATTERN ?= .
+GO_OLD ?= 1.25.6
+GO_NEW ?= 1.26
+
+.PHONY: benchmark
+benchmark: ## Run Go benchmarks locally
+	$(GOTEST) -bench=$(BENCH_PATTERN) -benchmem -benchtime=$(BENCH_TIME) -count=$(BENCH_COUNT) -timeout=$(BENCH_TIMEOUT) -run='^$$' ./pkg/services/ ./pkg/alertstore/memory/
+
+.PHONY: benchmark-short
+benchmark-short: ## Run quick benchmarks (1 iteration, 1s)
+	$(GOTEST) -bench=$(BENCH_PATTERN) -benchmem -benchtime=1s -count=1 -timeout=10m -run='^$$' ./pkg/services/ ./pkg/alertstore/memory/
+
+.PHONY: benchmark-save
+benchmark-save: ## Run benchmarks and save results to file
+	@mkdir -p benchmark-results
+	$(GOTEST) -bench=$(BENCH_PATTERN) -benchmem -benchtime=$(BENCH_TIME) -count=$(BENCH_COUNT) -timeout=$(BENCH_TIMEOUT) -run='^$$' ./pkg/services/ ./pkg/alertstore/memory/ | tee benchmark-results/bench-$$(date +%Y%m%d_%H%M%S).txt
+
+.PHONY: benchmark-docker
+benchmark-docker: ## Run benchmarks in Docker (Go version comparison)
+	./hack/run-benchmarks.sh $(GO_OLD) $(GO_NEW)
+
+.PHONY: benchmark-analyze
+benchmark-analyze: ## Analyze benchmark results (requires two result files)
+	@echo "Usage: make benchmark-analyze OLD=<old.txt> NEW=<new.txt>"
+	@echo "Example: make benchmark-analyze OLD=benchmark-results/go-1.25.5.txt NEW=benchmark-results/go-1.26.txt"
+	@test -n "$(OLD)" -a -n "$(NEW)" || { echo "Error: OLD and NEW must be set"; exit 1; }
+	$(GOCMD) run hack/benchanalyze/main.go -old $(OLD) -new $(NEW) -output benchmark-results/ -old-label "Go $(GO_OLD)" -new-label "Go $(GO_NEW)"
+
+.PHONY: benchmark-visualize
+benchmark-visualize: ## Generate charts from benchmark comparison JSON
+	@echo "Usage: make benchmark-visualize JSON=<comparison.json>"
+	@test -n "$(JSON)" || { echo "Error: JSON must be set (e.g. JSON=benchmark-results/comparison.json)"; exit 1; }
+	python3 hack/visualize-benchmarks.py $(JSON)
+
 .PHONY: run-local-docker
 run-local-docker: ## Build frontend, build docker image, and run locally connected to Kind
 	@echo "Building frontend..."
