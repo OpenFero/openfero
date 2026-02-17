@@ -393,7 +393,7 @@ func writeMarkdown(report Report, outputDir string) error {
 
 	// Summary
 	s := report.Summary
-	fmt.Fprintln(w, "## Summary\n")
+	fmt.Fprintf(w, "## Summary\n\n")
 	fmt.Fprintf(w, "| Metric | Value |\n")
 	fmt.Fprintf(w, "|--------|-------|\n")
 	fmt.Fprintf(w, "| Total benchmarks | %d |\n", s.TotalBenchmarks)
@@ -413,7 +413,7 @@ func writeMarkdown(report Report, outputDir string) error {
 	}
 
 	// Interpretation
-	fmt.Fprintln(w, "## Interpretation\n")
+	fmt.Fprintf(w, "## Interpretation\n\n")
 	switch {
 	case s.AvgNsPerOpChange < -5:
 		fmt.Fprintf(w, "%s shows **significant performance improvements** over %s ", report.NewLabel, report.OldLabel)
@@ -429,7 +429,7 @@ func writeMarkdown(report Report, outputDir string) error {
 	}
 
 	// GC impact analysis
-	fmt.Fprintln(w, "### GC / Allocation Impact\n")
+	fmt.Fprintf(w, "### GC / Allocation Impact\n\n")
 	if s.AvgBytesChange < -1 || s.AvgAllocsChange < -1 {
 		fmt.Fprintln(w, "The new Go version shows **reduced allocations**, which likely benefits from the improved garbage collector.")
 		fmt.Fprintf(w, "Average B/op change: %.2f%%, Average allocs/op change: %.2f%%\n\n", s.AvgBytesChange, s.AvgAllocsChange)
@@ -437,11 +437,11 @@ func writeMarkdown(report Report, outputDir string) error {
 		fmt.Fprintln(w, "Allocations have **increased** slightly. The GC improvements may still compensate at runtime.")
 		fmt.Fprintf(w, "Average B/op change: +%.2f%%, Average allocs/op change: +%.2f%%\n\n", s.AvgBytesChange, s.AvgAllocsChange)
 	} else {
-		fmt.Fprintln(w, "Allocation patterns are **unchanged** between versions. GC improvements will benefit throughput and latency under load.\n")
+		fmt.Fprintf(w, "Allocation patterns are **unchanged** between versions. GC improvements will benefit throughput and latency under load.\n\n")
 	}
 
 	// Detailed results by category
-	fmt.Fprintln(w, "## Detailed Results\n")
+	fmt.Fprintf(w, "## Detailed Results\n\n")
 
 	// Group by category
 	categories := make(map[string][]ComparisonEntry)
@@ -493,7 +493,7 @@ func writeMarkdown(report Report, outputDir string) error {
 	}
 
 	// Recommendations
-	fmt.Fprintln(w, "## Recommendations\n")
+	fmt.Fprintf(w, "## Recommendations\n\n")
 
 	if s.AvgNsPerOpChange < -1 {
 		fmt.Fprintf(w, "1. **Upgrade recommended**: %s provides measurable performance gains\n", report.NewLabel)
@@ -509,7 +509,7 @@ func writeMarkdown(report Report, outputDir string) error {
 	fmt.Fprintln(w)
 
 	// How to reproduce
-	fmt.Fprintln(w, "## Reproduction\n")
+	fmt.Fprintf(w, "## Reproduction\n\n")
 	fmt.Fprintln(w, "```bash")
 	fmt.Fprintln(w, "# Run benchmarks locally")
 	fmt.Fprintf(w, "make benchmark\n\n")

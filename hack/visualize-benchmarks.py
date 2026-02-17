@@ -18,9 +18,11 @@ import json
 import os
 import sys
 
+
 def check_matplotlib():
     try:
         import matplotlib
+
         return True
     except ImportError:
         return False
@@ -31,7 +33,9 @@ def main():
         print("Usage: python3 hack/visualize-benchmarks.py <comparison.json>")
         print("")
         print("Generate the JSON first:")
-        print("  go run hack/benchanalyze/main.go -old results/go-1.25.5.txt -new results/go-1.26.txt -output results/")
+        print(
+            "  go run hack/benchanalyze/main.go -old results/go-1.25.5.txt -new results/go-1.26.txt -output results/"
+        )
         sys.exit(1)
 
     json_path = sys.argv[1]
@@ -43,6 +47,7 @@ def main():
         sys.exit(1)
 
     import matplotlib
+
     matplotlib.use("Agg")  # Non-interactive backend
     import matplotlib.pyplot as plt
     import matplotlib.ticker as mticker
@@ -78,8 +83,22 @@ def main():
     x = range(len(names))
     width = 0.35
 
-    bars1 = ax.bar([i - width/2 for i in x], old_ns, width, label=old_label, color=color_old, alpha=0.85)
-    bars2 = ax.bar([i + width/2 for i in x], new_ns, width, label=new_label, color=color_new, alpha=0.85)
+    bars1 = ax.bar(
+        [i - width / 2 for i in x],
+        old_ns,
+        width,
+        label=old_label,
+        color=color_old,
+        alpha=0.85,
+    )
+    bars2 = ax.bar(
+        [i + width / 2 for i in x],
+        new_ns,
+        width,
+        label=new_label,
+        color=color_new,
+        alpha=0.85,
+    )
 
     ax.set_xlabel("Benchmark")
     ax.set_ylabel("ns/op (lower is better)")
@@ -101,7 +120,10 @@ def main():
     sorted_indices = sorted(range(len(pct_changes)), key=lambda i: pct_changes[i])
     sorted_names = [names[i] for i in sorted_indices]
     sorted_changes = [pct_changes[i] for i in sorted_indices]
-    bar_colors = [color_better if c < -1 else (color_worse if c > 1 else color_neutral) for c in sorted_changes]
+    bar_colors = [
+        color_better if c < -1 else (color_worse if c > 1 else color_neutral)
+        for c in sorted_changes
+    ]
 
     fig, ax = plt.subplots(figsize=(12, max(6, len(names) * 0.35)))
     ax.barh(sorted_names, sorted_changes, color=bar_colors, alpha=0.85)
@@ -131,8 +153,22 @@ def main():
 
     # B/op
     y_pos = range(len(names))
-    ax1.barh([i - 0.15 for i in y_pos], old_bytes, 0.3, label=old_label, color=color_old, alpha=0.85)
-    ax1.barh([i + 0.15 for i in y_pos], new_bytes, 0.3, label=new_label, color=color_new, alpha=0.85)
+    ax1.barh(
+        [i - 0.15 for i in y_pos],
+        old_bytes,
+        0.3,
+        label=old_label,
+        color=color_old,
+        alpha=0.85,
+    )
+    ax1.barh(
+        [i + 0.15 for i in y_pos],
+        new_bytes,
+        0.3,
+        label=new_label,
+        color=color_new,
+        alpha=0.85,
+    )
     ax1.set_yticks(list(y_pos))
     ax1.set_yticklabels(names, fontsize=7)
     ax1.set_xlabel("B/op (lower is better)")
@@ -141,8 +177,22 @@ def main():
     ax1.grid(axis="x", alpha=0.3)
 
     # allocs/op
-    ax2.barh([i - 0.15 for i in y_pos], old_allocs, 0.3, label=old_label, color=color_old, alpha=0.85)
-    ax2.barh([i + 0.15 for i in y_pos], new_allocs, 0.3, label=new_label, color=color_new, alpha=0.85)
+    ax2.barh(
+        [i - 0.15 for i in y_pos],
+        old_allocs,
+        0.3,
+        label=old_label,
+        color=color_old,
+        alpha=0.85,
+    )
+    ax2.barh(
+        [i + 0.15 for i in y_pos],
+        new_allocs,
+        0.3,
+        label=new_label,
+        color=color_new,
+        alpha=0.85,
+    )
     ax2.set_yticks(list(y_pos))
     ax2.set_yticklabels(names, fontsize=7)
     ax2.set_xlabel("allocs/op (lower is better)")
@@ -150,7 +200,9 @@ def main():
     ax2.legend(fontsize=8)
     ax2.grid(axis="x", alpha=0.3)
 
-    fig.suptitle(f"Memory Allocation Comparison: {old_label} vs {new_label}", fontsize=14)
+    fig.suptitle(
+        f"Memory Allocation Comparison: {old_label} vs {new_label}", fontsize=14
+    )
     fig.tight_layout()
     chart_path = os.path.join(output_dir, "allocs_comparison.png")
     fig.savefig(chart_path, dpi=150)
@@ -168,7 +220,10 @@ def main():
     cat_names = sorted(cat_changes.keys())
     cat_avgs = [sum(cat_changes[c]) / len(cat_changes[c]) for c in cat_names]
     cat_labels = [f"{c} (n={cat_counts[c]})" for c in cat_names]
-    cat_colors = [color_better if v < -1 else (color_worse if v > 1 else color_neutral) for v in cat_avgs]
+    cat_colors = [
+        color_better if v < -1 else (color_worse if v > 1 else color_neutral)
+        for v in cat_avgs
+    ]
 
     fig, ax = plt.subplots(figsize=(10, max(4, len(cat_names) * 0.6)))
     ax.barh(cat_labels, cat_avgs, color=cat_colors, alpha=0.85)

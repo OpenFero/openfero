@@ -26,28 +26,28 @@ BENCH_PATTERN="${BENCH_PATTERN:-.}"
 shift 2 2>/dev/null || true
 
 while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --count)
-            BENCH_COUNT="$2"
-            shift 2
-            ;;
-        --benchtime)
-            BENCH_TIME="$2"
-            shift 2
-            ;;
-        --timeout)
-            BENCH_TIMEOUT="$2"
-            shift 2
-            ;;
-        --pattern)
-            BENCH_PATTERN="$2"
-            shift 2
-            ;;
-        *)
-            echo "Unknown argument: $1"
-            exit 1
-            ;;
-    esac
+	case "$1" in
+	--count)
+		BENCH_COUNT="$2"
+		shift 2
+		;;
+	--benchtime)
+		BENCH_TIME="$2"
+		shift 2
+		;;
+	--timeout)
+		BENCH_TIMEOUT="$2"
+		shift 2
+		;;
+	--pattern)
+		BENCH_PATTERN="$2"
+		shift 2
+		;;
+	*)
+		echo "Unknown argument: $1"
+		exit 1
+		;;
+	esac
 done
 
 # Timestamp for this run
@@ -69,7 +69,7 @@ echo ""
 mkdir -p "${RUN_DIR}"
 
 # Save run metadata
-cat > "${RUN_DIR}/metadata.json" <<EOF
+cat >"${RUN_DIR}/metadata.json" <<EOF
 {
   "timestamp": "${TIMESTAMP}",
   "go_old": "${GO_OLD}",
@@ -84,40 +84,40 @@ cat > "${RUN_DIR}/metadata.json" <<EOF
 EOF
 
 run_benchmark() {
-    local go_version="$1"
-    local label="$2"
-    local output_file="${RUN_DIR}/${label}.txt"
-    local image_tag="openfero-bench:go${go_version}"
+	local go_version="$1"
+	local label="$2"
+	local output_file="${RUN_DIR}/${label}.txt"
+	local image_tag="openfero-bench:go${go_version}"
 
-    echo "--- Building benchmark image for Go ${go_version} ---"
-    docker build \
-        --build-arg "GO_VERSION=${go_version}" \
-        -t "${image_tag}" \
-        -f "${PROJECT_DIR}/hack/benchmark.dockerfile" \
-        "${PROJECT_DIR}" \
-        2>&1 | tail -5
+	echo "--- Building benchmark image for Go ${go_version} ---"
+	docker build \
+		--build-arg "GO_VERSION=${go_version}" \
+		-t "${image_tag}" \
+		-f "${PROJECT_DIR}/hack/benchmark.dockerfile" \
+		"${PROJECT_DIR}" \
+		2>&1 | tail -5
 
-    echo ""
-    echo "--- Running benchmarks with Go ${go_version} ---"
-    echo ""
+	echo ""
+	echo "--- Running benchmarks with Go ${go_version} ---"
+	echo ""
 
-    # Run benchmarks (no --run flag to skip unit tests, only benchmarks)
-    docker run --rm \
-        --cpus=2 \
-        --memory=4g \
-        "${image_tag}" \
-        -bench="${BENCH_PATTERN}" \
-        -benchmem \
-        -benchtime="${BENCH_TIME}" \
-        -count="${BENCH_COUNT}" \
-        -timeout="${BENCH_TIMEOUT}" \
-        -run='^$' \
-        ./pkg/services/ ./pkg/alertstore/memory/ \
-        2>&1 | tee "${output_file}"
+	# Run benchmarks (no --run flag to skip unit tests, only benchmarks)
+	docker run --rm \
+		--cpus=2 \
+		--memory=4g \
+		"${image_tag}" \
+		-bench="${BENCH_PATTERN}" \
+		-benchmem \
+		-benchtime="${BENCH_TIME}" \
+		-count="${BENCH_COUNT}" \
+		-timeout="${BENCH_TIMEOUT}" \
+		-run='^$' \
+		./pkg/services/ ./pkg/alertstore/memory/ \
+		2>&1 | tee "${output_file}"
 
-    echo ""
-    echo "Results saved to: ${output_file}"
-    echo ""
+	echo ""
+	echo "Results saved to: ${output_file}"
+	echo ""
 }
 
 # Run benchmarks for both versions
@@ -131,67 +131,67 @@ echo ""
 
 # Check if benchstat is available
 if command -v benchstat &>/dev/null; then
-    echo "--- benchstat comparison ---"
-    echo ""
-    benchstat "${RUN_DIR}/go-${GO_OLD}.txt" "${RUN_DIR}/go-${GO_NEW}.txt" | tee "${RUN_DIR}/comparison.txt"
-    echo ""
-    echo "Comparison saved to: ${RUN_DIR}/comparison.txt"
+	echo "--- benchstat comparison ---"
+	echo ""
+	benchstat "${RUN_DIR}/go-${GO_OLD}.txt" "${RUN_DIR}/go-${GO_NEW}.txt" | tee "${RUN_DIR}/comparison.txt"
+	echo ""
+	echo "Comparison saved to: ${RUN_DIR}/comparison.txt"
 elif command -v go &>/dev/null; then
-    echo "Installing benchstat..."
-    go install golang.org/x/perf/cmd/benchstat@latest
-    echo ""
-    echo "--- benchstat comparison ---"
-    echo ""
-    benchstat "${RUN_DIR}/go-${GO_OLD}.txt" "${RUN_DIR}/go-${GO_NEW}.txt" | tee "${RUN_DIR}/comparison.txt"
-    echo ""
-    echo "Comparison saved to: ${RUN_DIR}/comparison.txt"
+	echo "Installing benchstat..."
+	go install golang.org/x/perf/cmd/benchstat@latest
+	echo ""
+	echo "--- benchstat comparison ---"
+	echo ""
+	benchstat "${RUN_DIR}/go-${GO_OLD}.txt" "${RUN_DIR}/go-${GO_NEW}.txt" | tee "${RUN_DIR}/comparison.txt"
+	echo ""
+	echo "Comparison saved to: ${RUN_DIR}/comparison.txt"
 else
-    echo "benchstat not available. Install with: go install golang.org/x/perf/cmd/benchstat@latest"
-    echo "Then run manually:"
-    echo "  benchstat ${RUN_DIR}/go-${GO_OLD}.txt ${RUN_DIR}/go-${GO_NEW}.txt"
+	echo "benchstat not available. Install with: go install golang.org/x/perf/cmd/benchstat@latest"
+	echo "Then run manually:"
+	echo "  benchstat ${RUN_DIR}/go-${GO_OLD}.txt ${RUN_DIR}/go-${GO_NEW}.txt"
 fi
 
 echo ""
 
 # Run the Go analysis tool if available
 if command -v go &>/dev/null; then
-    echo "--- Running detailed analysis ---"
-    echo ""
-    go run "${PROJECT_DIR}/hack/benchanalyze/main.go" \
-        -old "${RUN_DIR}/go-${GO_OLD}.txt" \
-        -new "${RUN_DIR}/go-${GO_NEW}.txt" \
-        -output "${RUN_DIR}" \
-        -old-label "Go ${GO_OLD}" \
-        -new-label "Go ${GO_NEW}"
-    echo ""
+	echo "--- Running detailed analysis ---"
+	echo ""
+	go run "${PROJECT_DIR}/hack/benchanalyze/main.go" \
+		-old "${RUN_DIR}/go-${GO_OLD}.txt" \
+		-new "${RUN_DIR}/go-${GO_NEW}.txt" \
+		-output "${RUN_DIR}" \
+		-old-label "Go ${GO_OLD}" \
+		-new-label "Go ${GO_NEW}"
+	echo ""
 fi
 
 # Generate charts if comparison.json exists and a Python with matplotlib is available
 if [[ -f "${RUN_DIR}/comparison.json" ]]; then
-    PYTHON_CMD=""
+	PYTHON_CMD=""
 
-    # Check project venv first, then system python3
-    if [[ -x "${PROJECT_DIR}/.venv/bin/python" ]] && "${PROJECT_DIR}/.venv/bin/python" -c "import matplotlib" 2>/dev/null; then
-        PYTHON_CMD="${PROJECT_DIR}/.venv/bin/python"
-    elif command -v python3 &>/dev/null && python3 -c "import matplotlib" 2>/dev/null; then
-        PYTHON_CMD="python3"
-    fi
+	# Check project venv first, then system python3
+	if [[ -x "${PROJECT_DIR}/.venv/bin/python" ]] && "${PROJECT_DIR}/.venv/bin/python" -c "import matplotlib" 2>/dev/null; then
+		PYTHON_CMD="${PROJECT_DIR}/.venv/bin/python"
+	elif command -v python3 &>/dev/null && python3 -c "import matplotlib" 2>/dev/null; then
+		PYTHON_CMD="python3"
+	fi
 
-    if [[ -n "${PYTHON_CMD}" ]]; then
-        echo "--- Generating visualization charts ---"
-        echo ""
-        "${PYTHON_CMD}" "${PROJECT_DIR}/hack/visualize-benchmarks.py" "${RUN_DIR}/comparison.json"
-        echo ""
-    else
-        echo "matplotlib not installed. Install with: pip3 install matplotlib"
-        echo "Or create a venv: python3 -m venv .venv && .venv/bin/pip install matplotlib"
-        echo "Then run manually:"
-        echo "  make benchmark-visualize JSON=${RUN_DIR}/comparison.json"
-        echo ""
-    fi
+	if [[ -n "${PYTHON_CMD}" ]]; then
+		echo "--- Generating visualization charts ---"
+		echo ""
+		"${PYTHON_CMD}" "${PROJECT_DIR}/hack/visualize-benchmarks.py" "${RUN_DIR}/comparison.json"
+		echo ""
+	else
+		echo "matplotlib not installed. Install with: pip3 install matplotlib"
+		echo "Or create a venv: python3 -m venv .venv && .venv/bin/pip install matplotlib"
+		echo "Then run manually:"
+		echo "  make benchmark-visualize JSON=${RUN_DIR}/comparison.json"
+		echo ""
+	fi
 else
-    echo "Skipping visualization: comparison.json not found"
-    echo ""
+	echo "Skipping visualization: comparison.json not found"
+	echo ""
 fi
 
 echo "=============================================="
