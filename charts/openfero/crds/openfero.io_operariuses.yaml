@@ -101,7 +101,7 @@ spec:
                     type: boolean
                   ttl:
                     description: TTL defines the time to live for deduplication in
-                      seconds
+                      seconds. A value of 0 disables time-based deduplication.
                     format: int32
                     type: integer
                 type: object

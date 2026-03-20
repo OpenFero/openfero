@@ -339,7 +339,7 @@ func (s *OperariusService) CheckDeduplication(ctx context.Context, operarius *op
 		"openfero.io/group-key": utils.HashGroupKey(hookMessage.GroupKey),
 	}.AsSelector()
 
-	// Look for recent jobs
+	// Look for existing jobs
 	jobs, err := s.kubeClient.BatchV1().Jobs(operarius.Namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector.String(),
 	})
@@ -347,16 +347,13 @@ func (s *OperariusService) CheckDeduplication(ctx context.Context, operarius *op
 		return false, fmt.Errorf("failed to list jobs: %w", err)
 	}
 
-	// Check if any job was created within the TTL window
-	ttl := operarius.Spec.Deduplication.TTL
-	if ttl <= 0 {
-		ttl = 300 // Default 5 minutes
-	}
-
-	for _, job := range jobs.Items {
-		// Check if job is recent enough to trigger deduplication
-		if job.CreationTimestamp.Time.Add(time.Duration(ttl) * time.Second).After(time.Now()) {
-			return false, nil // Don't create, still within deduplication window
+	// Time-based check: block if a job was created within the TTL window.
+	// TTL <= 0 means time-based deduplication is disabled.
+	if operarius.Spec.Deduplication.TTL > 0 {
+		for _, job := range jobs.Items {
+			if job.CreationTimestamp.Time.Add(time.Duration(operarius.Spec.Deduplication.TTL) * time.Second).After(time.Now()) {
+				return false, nil // Don't create, still within deduplication window
+			}
 		}
 	}
 
@@ -390,6 +387,27 @@ func (s *OperariusService) GetOperariiForNamespace(ctx context.Context, namespac
 		zap.Int("count", len(operarii)))
 
 	return operarii, nil
+}
+
+// UpdateOperariusDedupStatus updates only the LastExecutionStatus field of an Operarius
+// when a job creation is skipped due to deduplication. It does not increment ExecutionCount
+// or change LastExecutionTime / LastExecutedJobName.
+func (s *OperariusService) UpdateOperariusDedupStatus(ctx context.Context, operarius *operariusv1alpha1.Operarius) error {
+	if s.operariusClient == nil {
+		log.Debug("No Operarius client configured, skipping dedup status update")
+		return nil
+	}
+
+	operarius.Status.LastExecutionStatus = "Skipped: Deduplication"
+
+	if err := s.operariusClient.UpdateStatus(ctx, operarius); err != nil {
+		return fmt.Errorf("failed to update Operarius dedup status: %w", err)
+	}
+
+	log.Debug("Updated Operarius dedup status",
+		zap.String("operarius", operarius.Name))
+
+	return nil
 }
 
 // UpdateOperariusStatus updates the status of an Operarius after job creation

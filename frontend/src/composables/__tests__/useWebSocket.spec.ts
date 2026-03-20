@@ -186,7 +186,6 @@ describe('useWebSocket', () => {
     })
 
     it('should handle malformed JSON gracefully', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       const { connect, lastMessage } = useWebSocket()
       connect()
       simulateOpen()
@@ -195,10 +194,7 @@ describe('useWebSocket', () => {
         data: 'not valid json',
       } as MessageEvent)
 
-      expect(consoleSpy).toHaveBeenCalled()
       expect(lastMessage.value).toBeNull()
-
-      consoleSpy.mockRestore()
     })
   })
 
@@ -310,14 +306,11 @@ describe('useWebSocket', () => {
       expect(getLatestMock().send).toHaveBeenCalledWith(JSON.stringify(message))
     })
 
-    it('should warn when trying to send while disconnected', () => {
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    it('should not send when disconnected', () => {
       const { send } = useWebSocket()
 
-      send({ type: 'ping' })
-
-      expect(consoleSpy).toHaveBeenCalledWith('WebSocket is not connected')
-      consoleSpy.mockRestore()
+      // Should silently ignore send when not connected
+      expect(() => send({ type: 'ping' })).not.toThrow()
     })
   })
 

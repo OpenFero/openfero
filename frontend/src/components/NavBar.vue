@@ -23,10 +23,6 @@ const showAboutModal = ref(false)
 const mobileMenuOpen = ref(false)
 
 function handleToggleConnection() {
-  console.log('NavBar: Toggling connection. Current state:', {
-    isConnected: socketStore.isConnected,
-    isPaused: socketStore.isPaused,
-  })
   socketStore.toggleConnection()
 }
 

@@ -115,6 +115,12 @@ func (s *Server) handleOperariusBasedJobs(ctx context.Context, hookMessage model
 					zap.String("operarius", operarius.Name),
 					zap.String("groupKey", hookMessage.GroupKey))
 
+				if err := s.OperariusService.UpdateOperariusDedupStatus(ctx, operarius); err != nil {
+					log.Warn("Failed to update Operarius dedup status",
+						zap.Error(err),
+						zap.String("operarius", operarius.Name))
+				}
+
 				var lastExecutionTime *time.Time
 				if operarius.Status.LastExecutionTime != nil {
 					t := operarius.Status.LastExecutionTime.Time

@@ -16,7 +16,6 @@ export const useJobsStore = defineStore('jobs', () => {
     () => socketStore.isConnected,
     (isConnected) => {
       if (isConnected) {
-        console.log('JobsStore: Socket reconnected, refreshing jobs...')
         fetch()
       }
     },

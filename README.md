@@ -1,6 +1,6 @@
 # OpenFero
 
-Open Fero is a little play on words from the Latin "opem fero", which means "to help" and the term "OpenSource". Hence the name "openfero". The scope of OpenFero is a framework for self-healing in a cloud-native environment.
+OpenFero is a little play on words from the Latin "opem fero", which means "to help" and the term "OpenSource". Hence the name "openfero". The scope of OpenFero is a framework for self-healing in a cloud-native environment.
 
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/OpenFero/openfero/badge)](https://scorecard.dev/viewer/?uri=github.com/OpenFero/openfero)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/6683/badge)](https://www.bestpractices.dev/projects/6683)
@@ -97,32 +97,6 @@ spec:
 - GitOps-friendly declarative management
 
 See the [Operarius CRD Documentation](docs/operarius-crds.md) for complete details.
-
-### 2. ConfigMaps (Legacy)
-
-The traditional approach stores operarios definitions in ConfigMaps with the naming convention `openfero-<alertname>-<status>`:
-
-#### Example Names
-
-- `openfero-KubeQuotaAlmostReached-firing`
-- `openfero-KubeQuotaAlmostReached-resolved`
-
-#### ConfigMap Example
-
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: openfero-kubequotaalmostfull-firing
-  labels:
-    app: openfero
-data:
-  image: python:latest
-  command: |
-    echo "Hello World - Alert: {{ .Alert.Labels.alertname }}"
-```
-
-**Migration:** Existing ConfigMap-based operarios can be migrated to CRDs. See the [Migration Guide](docs/operarius-crd-migration.md) for step-by-step instructions.
 
 ## Security note
 
