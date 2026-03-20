@@ -16,17 +16,14 @@ const (
 	AuthMethodNone   AuthMethod = "none"
 	AuthMethodBasic  AuthMethod = "basic"
 	AuthMethodBearer AuthMethod = "bearer"
-	AuthMethodOAuth2 AuthMethod = "oauth2"
 )
 
 // AuthConfig holds authentication configuration
 type AuthConfig struct {
-	Method         AuthMethod
-	BasicUser      string
-	BasicPass      string
-	BearerToken    string
-	OAuth2Issuer   string
-	OAuth2Audience string
+	Method      AuthMethod
+	BasicUser   string
+	BasicPass   string
+	BearerToken string
 }
 
 // AuthMiddleware creates a middleware function that handles authentication
@@ -48,8 +45,7 @@ func AuthMiddleware(config AuthConfig) func(http.HandlerFunc) http.HandlerFunc {
 				authenticated, authMethod = authenticateBasic(r, config.BasicUser, config.BasicPass)
 			case AuthMethodBearer:
 				authenticated, authMethod = authenticateBearer(r, config.BearerToken)
-			case AuthMethodOAuth2:
-				authenticated, authMethod = authenticateOAuth2(r, config.OAuth2Issuer, config.OAuth2Audience)
+
 			default:
 				log.Warn("Unknown authentication method", zap.String("method", string(config.Method)))
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -68,10 +64,7 @@ func AuthMiddleware(config AuthConfig) func(http.HandlerFunc) http.HandlerFunc {
 					w.Header().Set("WWW-Authenticate", "Basic realm=\"OpenFero\"")
 				case AuthMethodBearer:
 					w.Header().Set("WWW-Authenticate", "Bearer realm=\"OpenFero\"")
-				case AuthMethodOAuth2:
-					w.Header().Set("WWW-Authenticate", "Bearer realm=\"OpenFero\"")
 				}
-
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
@@ -128,17 +121,4 @@ func authenticateBearer(r *http.Request, expectedToken string) (bool, string) {
 	tokenMatch := subtle.ConstantTimeCompare([]byte(token), []byte(expectedToken)) == 1
 
 	return tokenMatch, "bearer"
-}
-
-// authenticateOAuth2 performs OAuth2 token validation
-func authenticateOAuth2(r *http.Request, issuer, audience string) (bool, string) {
-	// TODO: Implement OAuth2 JWT token validation
-	// This would involve:
-	// 1. Extracting JWT token from Authorization header
-	// 2. Validating JWT signature against issuer's public key
-	// 3. Verifying token claims (issuer, audience, expiration, etc.)
-	// 4. For now, return false to indicate not implemented
-
-	log.Warn("OAuth2 authentication is not yet implemented")
-	return false, "oauth2"
 }
