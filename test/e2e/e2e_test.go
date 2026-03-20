@@ -637,6 +637,14 @@ spec:
 			Expect(err).NotTo(HaveOccurred())
 			Expect(output).To(ContainSubstring("ok"))
 		})
+
+		It("should respond to startupz endpoint", func() {
+			cmd := exec.Command("curl", "-s",
+				fmt.Sprintf("http://localhost:%s/startupz", localPort))
+			output, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output).To(ContainSubstring("ok"))
+		})
 	})
 
 	Context("API Endpoints", func() {
