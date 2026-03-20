@@ -246,6 +246,10 @@ func main() {
 		}
 	})
 
+	// Mark startup as complete after all informer caches are synced
+	server.StartupComplete.Store(true)
+	log.Info("Startup complete, all caches synced")
+
 	// Pass build information to handlers
 	handlers.SetBuildInfo(version, commit, date)
 
@@ -271,6 +275,7 @@ func main() {
 	log.Info("Starting webhook receiver")
 	http.HandleFunc("GET /healthz", server.HealthzGetHandler)
 	http.HandleFunc("GET /readiness", server.ReadinessGetHandler)
+	http.HandleFunc("GET /startupz", server.StartupzGetHandler)
 	http.HandleFunc("GET /alertStore", server.AlertStoreGetHandler)
 	http.HandleFunc("GET /alerts", server.AlertsGetHandler)
 

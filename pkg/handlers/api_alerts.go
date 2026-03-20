@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/OpenFero/openfero/pkg/alertstore"
@@ -30,6 +31,7 @@ type Server struct {
 	AlertStore       alertstore.Store
 	AuthConfig       AuthConfig
 	OperariusService *services.OperariusService // Service for Operarius CRDs
+	StartupComplete  atomic.Bool                // Set to true after informer caches are synced
 }
 
 // AlertsGetHandler handles GET requests to /alerts
