@@ -93,7 +93,7 @@ After migration, confirm that:
 ## Key Differences
 
 | Feature | ConfigMap (removed) | Operarius CRD |
-|---|---|---|
+| --- | --- | --- |
 | Schema validation | None | Full CRD validation |
 | Alert matching | Name convention only | `alertSelector` with labels |
 | Deduplication | Not supported | Built-in TTL-based dedup |

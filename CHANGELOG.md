@@ -42,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Responsive design
   - Alert search and filtering
   - Job status monitoring
-- **E2E Test Suite**: Comprehensive end-to-end tests for the alert-to-job remediation flow
+- **End-to-end Test Suite**: Comprehensive end-to-end tests for the alert-to-job remediation flow
 - **OPENFERO_* Environment Variables**: Alert labels are now injected as `OPENFERO_LABEL_*` environment variables in remediation jobs (both ConfigMap and CRD paths)
 
 ### Changed
