@@ -11,10 +11,9 @@ applyTo: "frontend/**"
 - **Build Tool**: Vite
 - **State Management**: Pinia
 - **Routing**: Vue Router 4
-- **Workflow Visualization**: vue-flow
 - **Styling**: Tailwind CSS
 - **Testing**: Vitest + Vue Test Utils
-- **Realtime**: Server-Sent Events (SSE)
+- **Realtime**: WebSocket
 
 ## Project Structure
 
@@ -27,27 +26,23 @@ frontend/
 │   │   └── client.ts        # Base fetch client
 │   ├── components/          # Reusable UI components
 │   │   ├── AlertCard.vue    # Single alert display
-│   │   ├── JobNode.vue      # Job node for vue-flow
-│   │   ├── WorkflowEdge.vue # Custom edge for workflow
-│   │   ├── NavBar.vue       # Navigation bar
-│   │   └── ThemeToggle.vue  # Dark/light mode toggle
+│   │   ├── JobTable.vue     # Remediation rules table
+│   │   └── NavBar.vue       # Navigation bar
 │   ├── composables/         # Vue composables
-│   │   ├── useSSE.ts        # Server-Sent Events
+│   │   ├── useDateTime.ts   # Date/time formatting
 │   │   ├── useTheme.ts      # Theme management
-│   │   └── useTimestamp.ts  # Timestamp formatting
+│   │   └── useWebSocket.ts  # WebSocket connection
 │   ├── stores/              # Pinia stores
 │   │   ├── alerts.ts        # Alert state
+│   │   ├── app.ts           # Build info state
 │   │   ├── jobs.ts          # Job state
-│   │   └── workflow.ts      # Workflow graph state
+│   │   └── socket.ts        # WebSocket state
 │   ├── views/               # Page components
 │   │   ├── AlertsView.vue   # Alerts list page
-│   │   ├── JobsView.vue     # Jobs table page
-│   │   ├── WorkflowView.vue # Workflow visualization
-│   │   └── AboutView.vue    # About page
+│   │   └── JobsView.vue     # Jobs table page
 │   ├── types/               # TypeScript types
 │   │   ├── alert.ts         # Alert interfaces
-│   │   ├── job.ts           # Job interfaces
-│   │   └── workflow.ts      # Workflow node/edge types
+│   │   └── app.ts           # Build info types
 │   ├── App.vue              # Root component
 │   ├── main.ts              # Application entry
 │   └── router.ts            # Vue Router config
