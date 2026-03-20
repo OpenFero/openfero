@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed `deduplication.ttl: 0` silently defaulting to a 300 second window instead of disabling time-based deduplication.
+- Fixed Operarius CRD `status.lastExecutionStatus` not being updated when job creation is skipped due to deduplication; it now reports `Skipped: Deduplication`.
 - Fixed syntax error in auth middleware after OAuth2 removal (missing switch closing brace).
 - Fixed Swagger comment in jobs endpoint: "ConfigMaps" replaced with "Operarius CRDs".
 - Removed debug `console.log` statements from frontend WebSocket, store, and component code.

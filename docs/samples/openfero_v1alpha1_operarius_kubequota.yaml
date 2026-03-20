@@ -87,7 +87,7 @@ spec:
   # OpenFero-specific configuration
   deduplication:
     enabled: true
-    ttl: 300 # Don't create duplicate jobs for 5 minutes
+    ttl: 300 # Dedup window in seconds; 0 disables time-based dedup (require ttlSecondsAfterFinished >= ttl)
 
   priority: 100
   enabled: true
