@@ -42,7 +42,7 @@ export const useSocketStore = defineStore('socket', () => {
       }
     }
 
-    socket.onerror = (_e) => {
+    socket.onerror = () => {
       error.value = 'Connection error'
     }
 
@@ -52,7 +52,7 @@ export const useSocketStore = defineStore('socket', () => {
         listeners.forEach((listener) => {
           listener(message)
         })
-      } catch (_e) {
+      } catch {
         // Ignore unparsable messages
       }
     }

@@ -60,12 +60,12 @@ export function useWebSocket(path: string = '/api/ws', options: WSOptions = {}) 
             lastMessage.value = message
             options.onMessage?.(message)
           }
-        } catch (_e) {
+        } catch {
           // Ignore unparsable messages
         }
       }
 
-      socket.onclose = (event) => {
+      socket.onclose = () => {
         isConnected.value = false
         options.onDisconnect?.()
 
@@ -82,11 +82,11 @@ export function useWebSocket(path: string = '/api/ws', options: WSOptions = {}) 
         }
       }
 
-      socket.onerror = (_event) => {
+      socket.onerror = (event) => {
         error.value = 'WebSocket connection error'
-        options.onError?.(_event)
+        options.onError?.(event)
       }
-    } catch (_e) {
+    } catch {
       error.value = 'Failed to establish WebSocket connection'
     }
   }
