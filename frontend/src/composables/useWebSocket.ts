@@ -48,7 +48,6 @@ export function useWebSocket(path: string = '/api/ws', options: WSOptions = {}) 
         isConnected.value = true
         error.value = null
         reconnectAttempts = 0
-        console.log('WebSocket connected')
         options.onConnect?.()
       }
 
@@ -62,20 +61,18 @@ export function useWebSocket(path: string = '/api/ws', options: WSOptions = {}) 
             options.onMessage?.(message)
           }
         } catch (e) {
-          console.error('Failed to parse WebSocket message:', e, event.data)
+          // Ignore unparseable messages
         }
       }
 
       socket.onclose = (event) => {
         isConnected.value = false
-        console.log('WebSocket disconnected', event.code, event.reason)
         options.onDisconnect?.()
 
         // Attempt to reconnect if not manually disconnected
         if (!isManualDisconnect && reconnectAttempts < maxReconnectAttempts) {
           reconnectAttempts++
           error.value = `Connection lost. Reconnecting... (${reconnectAttempts}/${maxReconnectAttempts})`
-          console.log(`Reconnecting in ${reconnectInterval}ms (attempt ${reconnectAttempts})`)
 
           reconnectTimeout = setTimeout(() => {
             connect()
@@ -86,12 +83,10 @@ export function useWebSocket(path: string = '/api/ws', options: WSOptions = {}) 
       }
 
       socket.onerror = (event) => {
-        console.error('WebSocket error:', event)
         error.value = 'WebSocket connection error'
         options.onError?.(event)
       }
     } catch (e) {
-      console.error('Failed to create WebSocket:', e)
       error.value = 'Failed to establish WebSocket connection'
     }
   }
@@ -116,8 +111,6 @@ export function useWebSocket(path: string = '/api/ws', options: WSOptions = {}) 
   function send(message: unknown) {
     if (socket?.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify(message))
-    } else {
-      console.warn('WebSocket is not connected')
     }
   }
 
