@@ -98,32 +98,6 @@ spec:
 
 See the [Operarius CRD Documentation](docs/operarius-crds.md) for complete details.
 
-### 2. ConfigMaps (Legacy)
-
-The traditional approach stores operarios definitions in ConfigMaps with the naming convention `openfero-<alertname>-<status>`:
-
-#### Example Names
-
-- `openfero-KubeQuotaAlmostReached-firing`
-- `openfero-KubeQuotaAlmostReached-resolved`
-
-#### ConfigMap Example
-
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: openfero-kubequotaalmostfull-firing
-  labels:
-    app: openfero
-data:
-  image: python:latest
-  command: |
-    echo "Hello World - Alert: {{ .Alert.Labels.alertname }}"
-```
-
-**Migration:** Existing ConfigMap-based operarios can be migrated to CRDs. See the [Migration Guide](docs/operarius-crd-migration.md) for step-by-step instructions.
-
 ## Security note
 
 The service account that is installed when deploying openfero is for openfero itself. For the operarios, separate service accounts must be rolled out, which have the appropriate permissions for the remediation.

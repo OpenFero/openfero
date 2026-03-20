@@ -13,7 +13,7 @@ import (
 
 // JobsAPIHandler handles GET requests to /api/jobs - returns JSON
 // @Summary Get all configured jobs
-// @Description Returns a list of all job definitions from ConfigMaps
+// @Description Returns a list of all remediation rules from Operarius CRDs
 // @Tags jobs
 // @Produce json
 // @Success 200 {array} models.JobInfo
