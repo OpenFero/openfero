@@ -68,7 +68,7 @@ spec:
 
   deduplication:
     enabled: true
-    ttl: 600 # Don't restart same pod for 10 minutes
+    ttl: 600 # Dedup window in seconds; 0 disables time-based dedup (require ttlSecondsAfterFinished >= ttl)
 
   priority: 50
   enabled: true

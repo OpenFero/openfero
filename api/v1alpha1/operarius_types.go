@@ -44,7 +44,8 @@ type DeduplicationConfig struct {
 	// +optional
 	Enabled bool `json:"enabled,omitempty"`
 
-	// TTL defines the time to live for deduplication in seconds
+	// TTL defines the time to live for deduplication in seconds.
+	// A value of 0 disables time-based deduplication.
 	// +optional
 	TTL int32 `json:"ttl,omitempty"`
 }

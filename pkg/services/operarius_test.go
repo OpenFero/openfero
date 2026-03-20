@@ -1026,7 +1026,7 @@ func TestOperariusService_DeduplicationDisabled(t *testing.T) {
 				Enabled: true,
 				TTL:     0,
 			},
-			wantCreate: true, // Zero TTL means no dedup window
+			wantCreate: true, // Zero TTL disables time-based deduplication
 		},
 	}
 
@@ -1519,7 +1519,7 @@ func TestMatchesHookMessage_LabelsFromFirstAlert(t *testing.T) {
 	assert.True(t, result, "Should match because first alert has production environment")
 }
 
-// TestCheckDeduplication_DefaultTTL tests that default TTL is used when TTL is zero
+// TestCheckDeduplication_DefaultTTL tests that TTL=0 disables time-based deduplication
 func TestCheckDeduplication_DefaultTTL(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
 	service := NewOperariusService(kubeClient)
@@ -1533,13 +1533,13 @@ func TestCheckDeduplication_DefaultTTL(t *testing.T) {
 		Spec: operariusv1alpha1.OperariusSpec{
 			Deduplication: &operariusv1alpha1.DeduplicationConfig{
 				Enabled: true,
-				TTL:     0, // Should use default of 300
+				TTL:     0, // Zero TTL disables time-based deduplication
 			},
 			Enabled: &enabled,
 		},
 	}
 
-	// Create a job that's 4 minutes old (within default 5 minute TTL)
+	// Create a job that's 4 minutes old
 	recentJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "recent-job",
@@ -1562,7 +1562,7 @@ func TestCheckDeduplication_DefaultTTL(t *testing.T) {
 
 	shouldCreate, err := service.CheckDeduplication(ctx, operarius, hookMessage)
 	assert.NoError(t, err)
-	assert.False(t, shouldCreate, "Should not create job within default TTL window")
+	assert.True(t, shouldCreate, "TTL=0 disables time-based dedup, so job should be allowed to create")
 }
 
 // TestApplyTemplateVariables_TemplateErrors tests error handling in template processing
