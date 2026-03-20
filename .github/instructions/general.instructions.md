@@ -54,10 +54,10 @@ openfero-<alertname>-<status>
 
 ### Frontend (Vue.js)
 
-- `frontend/src/views/`: Page components (AlertsView, JobsView, WorkflowView)
+- `frontend/src/views/`: Page components (AlertsView, JobsView)
 - `frontend/src/components/`: Reusable UI components
-- `frontend/src/stores/`: Pinia stores (alerts, jobs, workflow)
-- `frontend/src/composables/`: Vue composables (useSSE, useTheme)
+- `frontend/src/stores/`: Pinia stores (alerts, jobs, socket, app)
+- `frontend/src/composables/`: Vue composables (useWebSocket, useTheme, useDateTime)
 - `frontend/src/api/`: API client functions
 
 ### Infrastructure

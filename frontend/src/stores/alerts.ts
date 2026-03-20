@@ -17,7 +17,6 @@ export const useAlertsStore = defineStore('alerts', () => {
     () => socketStore.isConnected,
     (isConnected) => {
       if (isConnected) {
-        console.log('AlertsStore: Socket reconnected, refreshing alerts...')
         fetch()
       }
     },

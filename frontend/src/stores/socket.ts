@@ -33,19 +33,16 @@ export const useSocketStore = defineStore('socket', () => {
     socket.onopen = () => {
       isConnected.value = true
       error.value = null
-      console.log('WebSocket connected')
     }
 
     socket.onclose = () => {
       isConnected.value = false
-      console.log('WebSocket disconnected')
       if (!isPaused.value) {
         scheduleReconnect()
       }
     }
 
-    socket.onerror = (e) => {
-      console.error('WebSocket error:', e)
+    socket.onerror = () => {
       error.value = 'Connection error'
     }
 
@@ -55,8 +52,8 @@ export const useSocketStore = defineStore('socket', () => {
         listeners.forEach((listener) => {
           listener(message)
         })
-      } catch (e) {
-        console.error('Failed to parse WebSocket message:', e)
+      } catch {
+        // Ignore unparsable messages
       }
     }
   }
@@ -79,7 +76,6 @@ export const useSocketStore = defineStore('socket', () => {
   }
 
   function toggleConnection() {
-    console.log('SocketStore: toggleConnection called. isConnected:', isConnected.value)
     if (isConnected.value) {
       disconnect()
     } else {

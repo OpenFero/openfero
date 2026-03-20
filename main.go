@@ -69,8 +69,6 @@ func validateAuthConfig(config handlers.AuthConfig) error {
 			return fmt.Errorf("bearer authentication requires a token")
 		}
 		return nil
-	case handlers.AuthMethodOAuth2:
-		return fmt.Errorf("OAuth2 authentication is not yet implemented")
 	default:
 		return fmt.Errorf("unsupported authentication method: %s", config.Method)
 	}
@@ -100,12 +98,10 @@ func main() {
 	alertStoreClusterName := flag.String("alertStoreClusterName", "openfero", "Cluster name for memberlist alert store")
 
 	// Authentication flags
-	authMethod := flag.String("authMethod", "none", "authentication method for webhook endpoint (none, basic, bearer, oauth2)")
+	authMethod := flag.String("authMethod", "none", "authentication method for webhook endpoint (none, basic, bearer)")
 	authBasicUser := flag.String("authBasicUser", "", "username for basic authentication")
 	authBasicPass := flag.String("authBasicPass", "", "password for basic authentication")
 	authBearerToken := flag.String("authBearerToken", "", "bearer token for token-based authentication")
-	authOAuth2Issuer := flag.String("authOAuth2Issuer", "", "OAuth2 token issuer URL")
-	authOAuth2Audience := flag.String("authOAuth2Audience", "", "OAuth2 token audience")
 
 	// Operarius CRD flags
 	operariusNamespace := flag.String("operariusNamespace", "", "Kubernetes namespace to watch for Operarius CRDs")
@@ -159,12 +155,10 @@ func main() {
 
 	// Validate and create authentication configuration
 	authConfig := handlers.AuthConfig{
-		Method:         handlers.AuthMethod(*authMethod),
-		BasicUser:      *authBasicUser,
-		BasicPass:      *authBasicPass,
-		BearerToken:    *authBearerToken,
-		OAuth2Issuer:   *authOAuth2Issuer,
-		OAuth2Audience: *authOAuth2Audience,
+		Method:      handlers.AuthMethod(*authMethod),
+		BasicUser:   *authBasicUser,
+		BasicPass:   *authBasicPass,
+		BearerToken: *authBearerToken,
 	}
 
 	// Validate authentication configuration
@@ -276,7 +270,11 @@ func main() {
 	http.HandleFunc("GET /healthz", server.HealthzGetHandler)
 	http.HandleFunc("GET /readiness", server.ReadinessGetHandler)
 	http.HandleFunc("GET /startupz", server.StartupzGetHandler)
-	http.HandleFunc("GET /alertStore", server.AlertStoreGetHandler)
+	http.HandleFunc("GET /alertStore", func(w http.ResponseWriter, r *http.Request) {
+		log.Warn("Deprecated: /alertStore endpoint is deprecated, use /api/alerts instead",
+			zap.String("remoteAddr", r.RemoteAddr))
+		server.AlertStoreGetHandler(w, r)
+	})
 	http.HandleFunc("GET /alerts", server.AlertsGetHandler)
 
 	// Apply authentication middleware to the webhook endpoint
@@ -285,7 +283,7 @@ func main() {
 
 	// API routes (JSON)
 	http.HandleFunc("GET /api/jobs", server.JobsAPIHandler)
-	http.HandleFunc("GET /api/alerts", server.AlertStoreGetHandler) // Alias for /alertStore
+	http.HandleFunc("GET /api/alerts", server.AlertStoreGetHandler)
 	http.HandleFunc("GET /api/about", handlers.AboutAPIHandler)
 	http.HandleFunc("GET /api/ws", handlers.WebSocketHandler) // WebSocket for real-time updates
 
