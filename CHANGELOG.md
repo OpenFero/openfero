@@ -5,7 +5,17 @@ All notable changes to OpenFero will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.18.0] - Unreleased
+## [0.18.0] - 2026-03-21
+
+### Added
+
+- **Benchmark Infrastructure**: Comprehensive Go benchmark suite for comparing performance across Go versions on OpenFero's critical hot-paths.
+  - 37 benchmarks covering Operarius lookup, alert matching, template processing, job creation, deduplication, and alert store operations
+  - Docker-isolated comparison pipeline with pinned CPU/memory for reproducibility
+  - `benchstat` integration for statistical analysis
+  - Custom analysis tool (`hack/benchanalyze`) generating JSON, CSV, and Markdown reports
+  - `matplotlib` chart generation for visual comparison
+  - Makefile targets: `benchmark`, `benchmark-docker`, `benchmark-visualize`
 
 ### Removed
 
