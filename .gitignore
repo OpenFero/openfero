@@ -34,3 +34,6 @@ tmp/
 dist/
 .vscode/
 /openfero
+
+# Benchmark results (generated)
+benchmark-results/
