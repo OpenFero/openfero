@@ -52,6 +52,6 @@ export default defineConfig({
     // Generate source maps for debugging
     sourcemap: false,
     // Optimize for production
-    minify: 'esbuild',
+    minify: 'oxc',
   },
 })
