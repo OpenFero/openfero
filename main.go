@@ -196,6 +196,7 @@ func main() {
 	if err != nil {
 		log.Warn("Failed to initialize Operarius informer, falling back to API calls",
 			zap.Error(err))
+		metadata.OperariusSyncErrorsTotal.Inc()
 	}
 
 	// Create OperariusService and wire it up
