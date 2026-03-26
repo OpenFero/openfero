@@ -39,6 +39,16 @@ var (
 
 		Help: "Total number of jobs failed",
 	})
+
+	OperariusSyncErrorsTotal = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "openfero_operarius_sync_errors_total",
+		Help: "Total number of Operarius cache sync errors at startup",
+	})
+
+	OperariusItemsLoaded = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "openfero_operarius_items_loaded",
+		Help: "Current number of Operarius CRDs loaded in the informer cache",
+	})
 )
 
 // Function to get metrics values from runtime/metrics package as float64
@@ -55,7 +65,7 @@ func GetSingleMetricFloat(metricName string) float64 {
 }
 
 // function to return differemt sample values as float 64
-// curently it handles single values, in future it will handle histograms
+// currently it handles single values, in future it will handle histograms
 func getFloat64(sample metrics.Sample) float64 {
 	var floatVal float64
 	// Handle each sample.
@@ -96,6 +106,8 @@ func AddMetricsToPrometheusRegistry() {
 	prometheus.MustRegister(JobsCreatedTotal)
 	prometheus.MustRegister(JobsSucceededTotal)
 	prometheus.MustRegister(JobsFailedTotal)
+	prometheus.MustRegister(OperariusSyncErrorsTotal)
+	prometheus.MustRegister(OperariusItemsLoaded)
 	// Get descriptions for all supported metrics.
 	metricsMeta := metrics.All()
 	// Register metrics and retrieve the values in prometheus client

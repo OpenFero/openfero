@@ -1,0 +1,73 @@
+{{- if .Values.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "openfero.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openfero.labels" . | nindent 4 }}
+    {{- with .Values.prometheusRule.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: openfero.operarius
+      rules:
+        {{- if .Values.prometheusRule.alerts.operariusSyncError.enabled }}
+        - alert: OpenFeroOperariusSyncError
+          expr: openfero_operarius_sync_errors_total > 0
+          for: 0m
+          labels:
+            severity: {{ .Values.prometheusRule.alerts.operariusSyncError.severity }}
+          annotations:
+            summary: "OpenFero failed to sync Operarius cache at startup"
+            description: >-
+              OpenFero could not synchronize the Operarius informer cache during startup.
+              It has fallen back to direct API calls. Check the OpenFero pod logs for details.
+        {{- end }}
+        {{- if .Values.prometheusRule.alerts.operariusItemsEmpty.enabled }}
+        - alert: OpenFeroNoOperariusLoaded
+          expr: openfero_operarius_items_loaded == 0
+          for: 5m
+          labels:
+            severity: {{ .Values.prometheusRule.alerts.operariusItemsEmpty.severity }}
+          annotations:
+            summary: "OpenFero has no Operarius CRDs loaded"
+            description: >-
+              OpenFero has been running for more than 5 minutes without any Operarius CRDs
+              loaded in the informer cache. No alert remediations can be executed.
+              Verify that Operarius resources exist in namespace {{ .Release.Namespace }}.
+        {{- end }}
+    - name: openfero.jobs
+      rules:
+        {{- if .Values.prometheusRule.alerts.jobsFailing.enabled }}
+        - alert: OpenFeroRemediationJobsFailing
+          expr: rate(openfero_jobs_failed_total[5m]) > 0
+          for: 0m
+          labels:
+            severity: {{ .Values.prometheusRule.alerts.jobsFailing.severity }}
+          annotations:
+            summary: "OpenFero remediation jobs are failing"
+            description: >-
+              One or more OpenFero remediation jobs have failed in the last 5 minutes.
+              Check the job logs in namespace {{ .Release.Namespace }} for details.
+        {{- end }}
+        {{- if .Values.prometheusRule.alerts.highJobFailureRate.enabled }}
+        - alert: OpenFeroHighJobFailureRate
+          expr: >-
+            rate(openfero_jobs_failed_total[{{ .Values.prometheusRule.alerts.highJobFailureRate.window }}])
+            /
+            rate(openfero_jobs_created_total[{{ .Values.prometheusRule.alerts.highJobFailureRate.window }}])
+            > {{ .Values.prometheusRule.alerts.highJobFailureRate.threshold }}
+          for: 5m
+          labels:
+            severity: {{ .Values.prometheusRule.alerts.highJobFailureRate.severity }}
+          annotations:
+            summary: "OpenFero remediation job failure rate is high"
+            description: >-
+              More than {{ .Values.prometheusRule.alerts.highJobFailureRate.threshold | float64 | mulf 100 | int }}%
+              of OpenFero remediation jobs have failed over the last
+              {{ .Values.prometheusRule.alerts.highJobFailureRate.window }}.
+              Investigate recurring remediation failures in namespace {{ .Release.Namespace }}.
+        {{- end }}
+{{- end }}

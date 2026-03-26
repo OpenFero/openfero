@@ -10,6 +10,7 @@ import (
 
 	operariusv1alpha1 "github.com/OpenFero/openfero/api/v1alpha1"
 	log "github.com/OpenFero/openfero/pkg/logging"
+	"github.com/OpenFero/openfero/pkg/metadata"
 	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -164,6 +165,7 @@ func (c *OperariusClient) InitOperariusInformer(ctx context.Context, restConfig 
 					zap.String("name", operarius.Name),
 					zap.String("namespace", operarius.Namespace),
 					zap.String("alertname", operarius.Spec.AlertSelector.AlertName))
+				metadata.OperariusItemsLoaded.Inc()
 			}
 		},
 		UpdateFunc: func(old, new interface{}) {
@@ -185,6 +187,7 @@ func (c *OperariusClient) InitOperariusInformer(ctx context.Context, restConfig 
 				log.Debug("Operarius removed from store",
 					zap.String("name", operarius.Name),
 					zap.String("namespace", operarius.Namespace))
+				metadata.OperariusItemsLoaded.Dec()
 			}
 		},
 	})
