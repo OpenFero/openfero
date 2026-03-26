@@ -65,7 +65,7 @@ func GetSingleMetricFloat(metricName string) float64 {
 }
 
 // function to return differemt sample values as float 64
-// curently it handles single values, in future it will handle histograms
+// currently it handles single values, in future it will handle histograms
 func getFloat64(sample metrics.Sample) float64 {
 	var floatVal float64
 	// Handle each sample.
