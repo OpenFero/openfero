@@ -144,3 +144,34 @@ auth:
 operarius:
   # Enable Operarius CRD support
   enabled: true
+
+# PrometheusRule Configuration
+# Requires the Prometheus Operator (kube-prometheus-stack) to be installed in the cluster.
+prometheusRule:
+  # Set to true to create PrometheusRule resources with opt-in alerting rules.
+  enabled: false
+  # Additional labels added to the PrometheusRule resource (e.g. to match a Prometheus ruleSelector).
+  additionalLabels: {}
+  alerts:
+    # Alert when the Operarius informer fails to sync at startup.
+    # OpenFero falls back to direct API calls in this case, which may lead to degraded performance.
+    operariusSyncError:
+      enabled: true
+      severity: warning
+    # Alert when no Operarius CRDs are loaded in the informer cache.
+    # This means OpenFero cannot execute any remediations.
+    operariusItemsEmpty:
+      enabled: true
+      severity: critical
+    # Alert when remediation jobs are failing.
+    # Any job failure indicates a remediation script is broken or the target resource is unreachable.
+    jobsFailing:
+      enabled: true
+      severity: warning
+    # Alert when more than half of all recent remediation jobs have failed.
+    # Threshold is the ratio of failed to created jobs over the evaluation window (0.0 - 1.0).
+    highJobFailureRate:
+      enabled: true
+      severity: critical
+      threshold: "0.5"
+      window: "15m"
