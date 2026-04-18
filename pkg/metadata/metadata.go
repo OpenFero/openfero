@@ -8,7 +8,6 @@ import (
 
 	log "github.com/OpenFero/openfero/pkg/logging"
 	"github.com/prometheus/client_golang/prometheus"
-	"go.uber.org/zap"
 )
 
 const (
@@ -134,12 +133,12 @@ func AddMetricsToPrometheusRegistry() {
 func getMetricsOptions(metric metrics.Description) prometheus.Opts {
 	tokens := strings.Split(metric.Name, "/")
 	if len(tokens) < 2 {
-		log.Error("error getting metric options: invalid metric name", zap.String("metric", metric.Name))
+			log.Error("error getting metric options: invalid metric name", "metric", metric.Name)
 		return prometheus.Opts{}
 	}
 	nameTokens := strings.Split(tokens[len(tokens)-1], ":")
 	if len(nameTokens) < 2 {
-		log.Error("error getting metric options: invalid metric name format", zap.String("metric", metric.Name))
+			log.Error("error getting metric options: invalid metric name format", "metric", metric.Name)
 		return prometheus.Opts{}
 	}
 	// create a unique name for metric, that will be its primary key on the registry

@@ -7,13 +7,10 @@ import (
 "testing"
 
 "github.com/OpenFero/openfero/pkg/logging"
-"go.uber.org/zap"
 )
 
 func TestMain(m *testing.M) {
-	cfg := zap.NewDevelopmentConfig()
-	cfg.Level = zap.NewAtomicLevelAt(zap.WarnLevel)
-	if err := logging.SetConfig(cfg); err != nil {
+	if err := logging.SetLevel("warn"); err != nil {
 		os.Exit(1)
 	}
 	os.Exit(m.Run())

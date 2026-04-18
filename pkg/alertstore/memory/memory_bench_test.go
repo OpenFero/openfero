@@ -6,14 +6,11 @@ import (
 
 	"github.com/OpenFero/openfero/pkg/alertstore"
 	log "github.com/OpenFero/openfero/pkg/logging"
-	"go.uber.org/zap"
 )
 
 func init() {
 	// Initialize logger for benchmarks and suppress debug logging to avoid I/O noise
-	cfg := zap.NewProductionConfig()
-	cfg.Level = zap.NewAtomicLevelAt(zap.ErrorLevel)
-	_ = log.SetConfig(cfg)
+	_ = log.SetLevel("error")
 }
 
 func benchmarkAlertEntry(alertName string) alertstore.Alert {

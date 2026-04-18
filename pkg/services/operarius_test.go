@@ -18,16 +18,11 @@ import (
 	log "github.com/OpenFero/openfero/pkg/logging"
 	"github.com/OpenFero/openfero/pkg/models"
 	"github.com/OpenFero/openfero/pkg/utils"
-	"go.uber.org/zap"
 )
 
 func init() {
 	// Initialize logger for tests
-	cfg := zap.NewDevelopmentConfig()
-	err := log.SetConfig(cfg)
-	if err != nil {
-		panic(err)
-	}
+	_ = log.SetLevel("debug")
 }
 
 // Verify MockOperariusClient implements OperariusClientInterface

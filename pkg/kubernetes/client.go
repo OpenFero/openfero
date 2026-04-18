@@ -8,7 +8,6 @@ import (
 
 	log "github.com/OpenFero/openfero/pkg/logging"
 	"github.com/OpenFero/openfero/pkg/metadata"
-	"go.uber.org/zap"
 	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
@@ -32,7 +31,7 @@ func InitKubeClient(kubeconfig *string) *kubernetes.Clientset {
 	// Try in-cluster config first
 	config, err = rest.InClusterConfig()
 	if err != nil {
-		log.Debug("In-cluster configuration not available, trying kubeconfig file", zap.Error(err))
+		log.Debug("In-cluster configuration not available, trying kubeconfig file", "error", err)
 
 		kubeconfigPath := *kubeconfig
 		if kubeconfigPath == "" {
@@ -47,16 +46,16 @@ func InitKubeClient(kubeconfig *string) *kubernetes.Clientset {
 		// Use kubeconfig file
 		config, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath)
 		if err != nil {
-			log.Fatal("Could not create k8s configuration", zap.Error(err))
+			log.Fatal("Could not create k8s configuration", "error", err)
 		}
-		log.Info("Using kubeconfig file for cluster access", zap.String("kubeconfigPath", kubeconfigPath))
+		log.Info("Using kubeconfig file for cluster access", "kubeconfigPath", kubeconfigPath)
 	} else {
 		log.Info("Using in-cluster configuration")
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		log.Fatal("Could not create k8s client", zap.Error(err))
+		log.Fatal("Could not create k8s client", "error", err)
 	}
 
 	return clientset
@@ -102,8 +101,8 @@ func InitJobInformer(clientset *kubernetes.Clientset, jobDestinationNamespace st
 	)
 
 	log.Debug("Initializing Job informer",
-		zap.String("namespace", jobDestinationNamespace),
-		zap.String("labelSelector", metav1.FormatLabelSelector(labelSelector)))
+		"namespace", jobDestinationNamespace,
+		"labelSelector", metav1.FormatLabelSelector(labelSelector))
 
 	// Get Job informer
 	jobInformer := jobFactory.Batch().V1().Jobs().Informer()
@@ -112,7 +111,7 @@ func InitJobInformer(clientset *kubernetes.Clientset, jobDestinationNamespace st
 	if _, err := jobInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			job := obj.(*batchv1.Job)
-			log.Debug("Job added", zap.String("job", job.Name), zap.String("namespace", job.Namespace))
+			log.Debug("Job added", "job", job.Name, "namespace", job.Namespace)
 			metadata.JobsCreatedTotal.Inc()
 			if updateFunc != nil {
 				updateFunc(nil, job)
@@ -122,11 +121,11 @@ func InitJobInformer(clientset *kubernetes.Clientset, jobDestinationNamespace st
 			oldJob := old.(*batchv1.Job)
 			newJob := new.(*batchv1.Job)
 			if newJob.Status.Succeeded > 0 && oldJob.Status.Succeeded == 0 {
-				log.Debug("Job completed successfully", zap.String("job", newJob.Name), zap.String("namespace", newJob.Namespace))
+				log.Debug("Job completed successfully", "job", newJob.Name, "namespace", newJob.Namespace)
 				metadata.JobsSucceededTotal.Inc()
 			}
 			if newJob.Status.Failed > 0 && oldJob.Status.Failed == 0 {
-				log.Debug("Job failed", zap.String("job", newJob.Name), zap.String("namespace", newJob.Namespace))
+				log.Debug("Job failed", "job", newJob.Name, "namespace", newJob.Namespace)
 				metadata.JobsFailedTotal.Inc()
 			}
 			if updateFunc != nil {
@@ -135,10 +134,10 @@ func InitJobInformer(clientset *kubernetes.Clientset, jobDestinationNamespace st
 		},
 		DeleteFunc: func(obj any) {
 			job := obj.(*batchv1.Job)
-			log.Debug("Job deleted", zap.String("job", job.Name), zap.String("namespace", job.Namespace))
+			log.Debug("Job deleted", "job", job.Name, "namespace", job.Namespace)
 		},
 	}); err != nil {
-		log.Fatal("Failed to add Job event handler", zap.Error(err))
+		log.Fatal("Failed to add Job event handler", "error", err)
 	}
 
 	// Start informer
@@ -146,9 +145,9 @@ func InitJobInformer(clientset *kubernetes.Clientset, jobDestinationNamespace st
 
 	// Wait for cache sync
 	if !cache.WaitForCacheSync(context.Background().Done(), jobInformer.HasSynced) {
-		log.Fatal("Failed to sync Job cache", zap.String("namespace", jobDestinationNamespace))
+		log.Fatal("Failed to sync Job cache", "namespace", jobDestinationNamespace)
 	}
-	log.Info("Job cache synced", zap.String("namespace", jobDestinationNamespace))
+	log.Info("Job cache synced", "namespace", jobDestinationNamespace)
 
 	return jobInformer.GetStore()
 }

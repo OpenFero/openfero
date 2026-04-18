@@ -4,7 +4,6 @@ import (
 	"github.com/OpenFero/openfero/pkg/alertstore"
 	log "github.com/OpenFero/openfero/pkg/logging"
 	"github.com/OpenFero/openfero/pkg/models"
-	"go.uber.org/zap"
 )
 
 // AlertBroadcastFunc is a callback function for broadcasting alert updates
@@ -44,17 +43,17 @@ func CheckAlertStatus(status string) bool {
 // SaveAlert saves an alert to the alertstore
 func SaveAlert(alertStore alertstore.Store, alert models.Alert, status string) {
 	log.Debug("Saving alert in alert store",
-		zap.String("alertname", alert.Labels["alertname"]),
-		zap.String("status", status))
+		"alertname", alert.Labels["alertname"],
+		"status", status)
 
 	// Convert to alertstore.Alert type
 	storeAlert := alert.ToAlertStoreAlert()
 	err := alertStore.SaveAlert(storeAlert, status)
 	if err != nil {
 		log.Error("Failed to save alert",
-			zap.String("alertname", alert.Labels["alertname"]),
-			zap.String("status", status),
-			zap.Error(err))
+			"alertname", alert.Labels["alertname"],
+			"status", status,
+			"error", err)
 		return
 	}
 
@@ -65,18 +64,18 @@ func SaveAlert(alertStore alertstore.Store, alert models.Alert, status string) {
 // SaveAlertWithJobInfo saves an alert to the alertstore with job information
 func SaveAlertWithJobInfo(alertStore alertstore.Store, alert models.Alert, status string, jobInfo *alertstore.JobInfo) {
 	log.Debug("Saving alert in alert store with job info",
-		zap.String("alertname", alert.Labels["alertname"]),
-		zap.String("status", status),
-		zap.String("jobName", jobInfo.JobName))
+		"alertname", alert.Labels["alertname"],
+		"status", status,
+		"jobName", jobInfo.JobName)
 
 	// Convert to alertstore.Alert type
 	storeAlert := alert.ToAlertStoreAlert()
 	err := alertStore.SaveAlertWithJobInfo(storeAlert, status, jobInfo)
 	if err != nil {
 		log.Error("Failed to save alert with job info",
-			zap.String("alertname", alert.Labels["alertname"]),
-			zap.String("status", status),
-			zap.Error(err))
+			"alertname", alert.Labels["alertname"],
+			"status", status,
+			"error", err)
 		return
 	}
 

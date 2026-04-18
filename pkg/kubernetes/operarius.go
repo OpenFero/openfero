@@ -10,7 +10,6 @@ import (
 	operariusv1alpha1 "github.com/OpenFero/openfero/api/v1alpha1"
 	log "github.com/OpenFero/openfero/pkg/logging"
 	"github.com/OpenFero/openfero/pkg/metadata"
-	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -151,9 +150,9 @@ func (c *OperariusClient) InitOperariusInformer(ctx context.Context) (cache.Stor
 			operarius, ok := obj.(*operariusv1alpha1.Operarius)
 			if ok {
 				log.Debug("Operarius added to store",
-					zap.String("name", operarius.Name),
-					zap.String("namespace", operarius.Namespace),
-					zap.String("alertname", operarius.Spec.AlertSelector.AlertName))
+					"name", operarius.Name,
+					"namespace", operarius.Namespace,
+					"alertname", operarius.Spec.AlertSelector.AlertName)
 				metadata.OperariusItemsLoaded.Inc()
 			}
 		},
@@ -166,16 +165,16 @@ func (c *OperariusClient) InitOperariusInformer(ctx context.Context) (cache.Stor
 					return
 				}
 				log.Debug("Operarius updated in store",
-					zap.String("name", newOp.Name),
-					zap.String("namespace", newOp.Namespace))
+					"name", newOp.Name,
+					"namespace", newOp.Namespace)
 			}
 		},
 		DeleteFunc: func(obj any) {
 			operarius, ok := obj.(*operariusv1alpha1.Operarius)
 			if ok {
 				log.Debug("Operarius removed from store",
-					zap.String("name", operarius.Name),
-					zap.String("namespace", operarius.Namespace))
+					"name", operarius.Name,
+					"namespace", operarius.Namespace)
 				metadata.OperariusItemsLoaded.Dec()
 			}
 		},
@@ -189,7 +188,7 @@ func (c *OperariusClient) InitOperariusInformer(ctx context.Context) (cache.Stor
 
 	// Wait for cache sync
 	log.Info("Waiting for Operarius cache to sync",
-		zap.String("namespace", c.namespace))
+		"namespace", c.namespace)
 
 	syncCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -200,8 +199,8 @@ func (c *OperariusClient) InitOperariusInformer(ctx context.Context) (cache.Stor
 
 	c.store = c.informer.GetStore()
 	log.Info("Operarius cache synced",
-		zap.String("namespace", c.namespace),
-		zap.Int("count", len(c.store.List())))
+		"namespace", c.namespace,
+		"count", len(c.store.List()))
 
 	return c.store, nil
 }
@@ -272,8 +271,8 @@ func (c *OperariusClient) UpdateStatus(ctx context.Context, operarius *operarius
 	}
 
 	log.Debug("Updated Operarius status",
-		zap.String("name", operarius.Name),
-		zap.Int32("executionCount", operarius.Status.ExecutionCount))
+		"name", operarius.Name,
+		"executionCount", operarius.Status.ExecutionCount)
 
 	return nil
 }

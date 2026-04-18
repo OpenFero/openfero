@@ -15,7 +15,6 @@ import (
 	"github.com/OpenFero/openfero/pkg/models"
 	"github.com/OpenFero/openfero/pkg/services"
 	"github.com/OpenFero/openfero/pkg/utils"
-	"go.uber.org/zap"
 	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -40,7 +39,7 @@ func (s *Server) AlertsGetHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set(ContentTypeHeader, ApplicationJSONVal)
 
 	if err := json.NewEncoder(w).Encode("OK"); err != nil {
-		log.Error("error encoding messages: ", zap.String("error", err.Error()))
+		log.Error("error encoding messages: ", "error", err.Error())
 	}
 }
 
@@ -49,13 +48,13 @@ func (s *Server) AlertsPostHandler(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(r.Body)
 	defer func() {
 		if err := r.Body.Close(); err != nil {
-			log.Error("Failed to close request body", zap.Error(err))
+			log.Error("Failed to close request body", "error", err)
 		}
 	}()
 
 	message := models.HookMessage{}
 	if err := dec.Decode(&message); err != nil {
-		log.Error("error decoding message: ", zap.String("error", err.Error()))
+		log.Error("error decoding message: ", "error", err.Error())
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -65,9 +64,9 @@ func (s *Server) AlertsPostHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Use zap's fields for structured logging instead of string concatenation
 	log.Debug("Webhook received",
-		zap.String("status", status),
-		zap.Int("alertCount", alertcount),
-		zap.String("groupKey", message.GroupKey))
+		"status", status,
+		"alertCount", alertcount,
+		"groupKey", message.GroupKey)
 
 	if !services.CheckAlertStatus(status) {
 		log.Warn("Status of alert was neither firing nor resolved, stop creating a response job.")
@@ -85,40 +84,40 @@ func (s *Server) AlertsPostHandler(w http.ResponseWriter, r *http.Request) {
 // handleOperariusBasedJobs handles job creation using Operarius CRDs
 func (s *Server) handleOperariusBasedJobs(ctx context.Context, hookMessage models.HookMessage) {
 	log.Debug("Processing webhook with Operarius CRDs",
-		zap.String("status", hookMessage.Status),
-		zap.String("groupKey", hookMessage.GroupKey),
-		zap.Int("alertCount", len(hookMessage.Alerts)))
+		"status", hookMessage.Status,
+		"groupKey", hookMessage.GroupKey,
+		"alertCount", len(hookMessage.Alerts))
 
 	var jobInfo *alertstore.JobInfo
 
 	operarii, err := s.OperariusService.GetOperariiForNamespace(ctx, "")
 	if err != nil {
-		log.Error("Failed to get Operarii", zap.Error(err))
+		log.Error("Failed to get Operarii", "error", err)
 		// Continue to store alert even if we can't get Operarii
 	} else {
 		// Find matching Operarius
 		operarius, err := s.OperariusService.FindMatchingOperarius(hookMessage, operarii)
 		if err != nil {
-			log.Info("No matching Operarius found - alert will be stored without remediation", zap.Error(err))
+			log.Info("No matching Operarius found - alert will be stored without remediation", "error", err)
 		} else {
 			log.Info("Found matching Operarius",
-				zap.String("operarius", operarius.Name),
-				zap.String("namespace", operarius.Namespace),
-				zap.Int32("priority", operarius.Spec.Priority))
+				"operarius", operarius.Name,
+				"namespace", operarius.Namespace,
+				"priority", operarius.Spec.Priority)
 
 			// Check deduplication
 			shouldCreate, err := s.OperariusService.CheckDeduplication(ctx, operarius, hookMessage)
 			if err != nil {
-				log.Error("Failed to check deduplication", zap.Error(err))
+				log.Error("Failed to check deduplication", "error", err)
 			} else if !shouldCreate {
 				log.Info("Skipping job creation due to deduplication",
-					zap.String("operarius", operarius.Name),
-					zap.String("groupKey", hookMessage.GroupKey))
+					"operarius", operarius.Name,
+					"groupKey", hookMessage.GroupKey)
 
 				if err := s.OperariusService.UpdateOperariusDedupStatus(ctx, operarius); err != nil {
 					log.Warn("Failed to update Operarius dedup status",
-						zap.Error(err),
-						zap.String("operarius", operarius.Name))
+						"error", err,
+						"operarius", operarius.Name)
 				}
 
 				var lastExecutionTime *time.Time
@@ -142,22 +141,22 @@ func (s *Server) handleOperariusBasedJobs(ctx context.Context, hookMessage model
 				job, err := s.OperariusService.CreateJobFromOperarius(ctx, operarius, hookMessage)
 				if err != nil {
 					log.Error("Failed to create job from Operarius",
-						zap.Error(err),
-						zap.String("operarius", operarius.Name))
+						"error", err,
+						"operarius", operarius.Name)
 					metadata.JobsFailedTotal.Inc()
 				} else {
 
 					log.Info("Successfully created remediation job",
-						zap.String("jobName", job.Name),
-						zap.String("operarius", operarius.Name),
-						zap.String("namespace", job.Namespace),
-						zap.String("groupKey", hookMessage.GroupKey))
+						"jobName", job.Name,
+						"operarius", operarius.Name,
+						"namespace", job.Namespace,
+						"groupKey", hookMessage.GroupKey)
 
 					// Update Operarius status with execution info
 					if err := s.OperariusService.UpdateOperariusStatus(ctx, operarius, job.Name); err != nil {
 						log.Warn("Failed to update Operarius status",
-							zap.Error(err),
-							zap.String("operarius", operarius.Name))
+							"error", err,
+							"operarius", operarius.Name)
 						// Don't return - job was created successfully, status update is best-effort
 					}
 
@@ -210,7 +209,7 @@ func (s *Server) AlertStoreGetHandler(w http.ResponseWriter, r *http.Request) {
 
 	alerts, err := s.AlertStore.GetAlerts(query, limit)
 	if err != nil {
-		log.Error("Error retrieving alerts", zap.Error(err))
+		log.Error("Error retrieving alerts", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -239,8 +238,8 @@ func (s *Server) AlertStoreGetHandler(w http.ResponseWriter, r *http.Request) {
 			} else {
 				// Job might be deleted or error
 				log.Debug("Failed to get job for alert",
-					zap.String("job", alerts[i].JobInfo.JobName),
-					zap.Error(err))
+					"job", alerts[i].JobInfo.JobName,
+					"error", err)
 			}
 		}
 	}
@@ -248,7 +247,7 @@ func (s *Server) AlertStoreGetHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set(ContentTypeHeader, ApplicationJSONVal)
 	err = json.NewEncoder(w).Encode(alerts)
 	if err != nil {
-		log.Error("Error encoding alerts", zap.Error(err))
+		log.Error("Error encoding alerts", "error", err)
 		http.Error(w, "", http.StatusInternalServerError)
 	}
 }

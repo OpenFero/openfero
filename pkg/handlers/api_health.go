@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	log "github.com/OpenFero/openfero/pkg/logging"
-	"go.uber.org/zap"
 )
 
 // HealthzGetHandler handles health status requests
@@ -15,7 +14,7 @@ import (
 // @Success 200 {string} string "ok"
 // @Router /healthz [get]
 func (s *Server) HealthzGetHandler(w http.ResponseWriter, r *http.Request) {
-	log.Debug("Health check requested", zap.String("path", r.URL.Path))
+	log.Debug("Health check requested", "path", r.URL.Path)
 	w.Header().Set(ContentTypeHeader, "text/plain")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
@@ -29,7 +28,7 @@ func (s *Server) HealthzGetHandler(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {string} string "ok"
 // @Router /readiness [get]
 func (s *Server) ReadinessGetHandler(w http.ResponseWriter, r *http.Request) {
-	log.Debug("Readiness check requested", zap.String("path", r.URL.Path))
+	log.Debug("Readiness check requested", "path", r.URL.Path)
 	w.Header().Set(ContentTypeHeader, "text/plain")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
@@ -44,7 +43,7 @@ func (s *Server) ReadinessGetHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure 503 {string} string "starting"
 // @Router /startupz [get]
 func (s *Server) StartupzGetHandler(w http.ResponseWriter, r *http.Request) {
-	log.Debug("Startup check requested", zap.String("path", r.URL.Path))
+	log.Debug("Startup check requested", "path", r.URL.Path)
 	w.Header().Set(ContentTypeHeader, "text/plain")
 	if !s.StartupComplete.Load() {
 		w.WriteHeader(http.StatusServiceUnavailable)
