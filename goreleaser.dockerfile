@@ -15,9 +15,9 @@ COPY --from=build-env /etc/passwd_single /etc/passwd
 COPY --from=build-env /etc/group_single /etc/group
 USER 10001
 
-# Add health check - for scratch images, this is basic but satisfies security requirements
-# Kubernetes liveness/readiness probes provide more robust health checking
+# Add health check - for scratch images, use an app-native health command
+# Kubernetes liveness/readiness probes still provide more robust health checking
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD /app/openfero --help || exit 1
+    CMD /app/openfero healthcheck || exit 1
 
 ENTRYPOINT ["/app/openfero"]
