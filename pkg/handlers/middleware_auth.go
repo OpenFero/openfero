@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	log "github.com/OpenFero/openfero/pkg/logging"
-	"go.uber.org/zap"
 )
 
 // AuthMethod represents the type of authentication method
@@ -47,17 +46,16 @@ func AuthMiddleware(config AuthConfig) func(http.HandlerFunc) http.HandlerFunc {
 				authenticated, authMethod = authenticateBearer(r, config.BearerToken)
 
 			default:
-				log.Warn("Unknown authentication method", zap.String("method", string(config.Method)))
+				log.Warn("Unknown authentication method", "method", string(config.Method))
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
 
 			if !authenticated {
 				log.Warn("Authentication failed",
-					zap.String("method", authMethod),
-					zap.String("remoteAddr", r.RemoteAddr),
-					zap.String("userAgent", r.UserAgent()))
-
+				"method", authMethod,
+				"remoteAddr", r.RemoteAddr,
+				"userAgent", r.UserAgent())
 				// Set appropriate WWW-Authenticate header
 				switch config.Method {
 				case AuthMethodBasic:
@@ -70,8 +68,8 @@ func AuthMiddleware(config AuthConfig) func(http.HandlerFunc) http.HandlerFunc {
 			}
 
 			log.Debug("Authentication successful",
-				zap.String("method", authMethod),
-				zap.String("remoteAddr", r.RemoteAddr))
+				"method", authMethod,
+				"remoteAddr", r.RemoteAddr)
 
 			next(w, r)
 		}

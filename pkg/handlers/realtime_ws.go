@@ -9,7 +9,6 @@ import (
 	log "github.com/OpenFero/openfero/pkg/logging"
 	"github.com/OpenFero/openfero/pkg/models"
 	"github.com/gorilla/websocket"
-	"go.uber.org/zap"
 )
 
 const (
@@ -88,7 +87,7 @@ func (h *WSHub) run() {
 			h.mu.Lock()
 			h.clients[client] = struct{}{}
 			h.mu.Unlock()
-			log.Debug("WebSocket client connected", zap.Int("totalClients", len(h.clients)))
+			log.Debug("WebSocket client connected", "totalClients", len(h.clients))
 
 		case client := <-h.unregister:
 			h.mu.Lock()
@@ -97,7 +96,7 @@ func (h *WSHub) run() {
 				close(client.send)
 			}
 			h.mu.Unlock()
-			log.Debug("WebSocket client disconnected", zap.Int("totalClients", len(h.clients)))
+			log.Debug("WebSocket client disconnected", "totalClients", len(h.clients))
 
 		case message := <-h.broadcast:
 			h.mu.RLock()
@@ -120,7 +119,7 @@ func (h *WSHub) Broadcast(msgType string, data any) {
 	msg := WSMessage{Type: msgType, Data: data}
 	jsonData, err := json.Marshal(msg)
 	if err != nil {
-		log.Error("Failed to marshal WebSocket message", zap.Error(err))
+		log.Error("Failed to marshal WebSocket message", "error", err)
 		return
 	}
 	h.broadcast <- jsonData
@@ -149,7 +148,7 @@ func (c *WSClient) readPump() {
 		_, _, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Debug("WebSocket read error", zap.Error(err))
+				log.Debug("WebSocket read error", "error", err)
 			}
 			break
 		}
@@ -209,7 +208,7 @@ func (c *WSClient) writePump() {
 func WebSocketHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Error("WebSocket upgrade failed", zap.Error(err))
+		log.Error("WebSocket upgrade failed", "error", err)
 		return
 	}
 
@@ -227,7 +226,7 @@ func WebSocketHandler(w http.ResponseWriter, r *http.Request) {
 	client.send <- jsonData
 
 	log.Debug("WebSocket client connected",
-		zap.String("remoteAddr", r.RemoteAddr))
+		"remoteAddr", r.RemoteAddr)
 
 	// Start read and write pumps in goroutines
 	go client.writePump()

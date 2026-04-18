@@ -13,7 +13,6 @@ import (
 	"github.com/OpenFero/openfero/pkg/alertstore"
 	log "github.com/OpenFero/openfero/pkg/logging"
 	"github.com/hashicorp/memberlist"
-	"go.uber.org/zap"
 )
 
 // MemberlistStore implements the alertstore.Store interface using memberlist
@@ -47,8 +46,8 @@ func NewMemberlistStore(clustername string, limit int) *MemberlistStore {
 	}
 
 	log.Debug("Creating new memberlist store",
-		zap.String("clusterName", clustername),
-		zap.Int("alertLimit", limit))
+		"clusterName", clustername,
+		"alertLimit", limit)
 
 	store := &MemberlistStore{
 		alerts: make([]alertEntry, 0, limit),
@@ -73,12 +72,12 @@ func (s *MemberlistStore) Initialize() error {
 	config.Events = s.delegate
 
 	log.Debug("Initializing memberlist with config",
-		zap.String("hostname", hostname))
+		"hostname", hostname)
 
 	// Create memberlist first
 	ml, err := memberlist.Create(config)
 	if err != nil {
-		log.Error("Failed to create memberlist", zap.Error(err))
+		log.Error("Failed to create memberlist", "error", err)
 		return fmt.Errorf("failed to create memberlist: %w", err)
 	}
 
@@ -105,34 +104,34 @@ func (s *MemberlistStore) Initialize() error {
 		namespaceData, readErr := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 		if readErr == nil {
 			namespace = string(namespaceData)
-			log.Debug("Discovered namespace from service account", zap.String("namespace", namespace))
+			log.Debug("Discovered namespace from service account", "namespace", namespace)
 		} else {
 			namespace = "default"
-			log.Debug("Using default namespace", zap.Error(readErr))
+			log.Debug("Using default namespace", "error", readErr)
 		}
 	}
 
 	// Form the service DNS name for Kubernetes
 	serviceDNS := fmt.Sprintf("%s.%s.svc.cluster.local", serviceName, namespace)
 	log.Info("Trying to join memberlist cluster",
-		zap.String("service", serviceDNS),
-		zap.String("namespace", namespace))
+		"service", serviceDNS,
+		"namespace", namespace)
 
 	// Try joining the cluster
 	joinCount, err := s.ml.Join([]string{serviceDNS})
 	if err != nil {
 		log.Warn("Failed to join cluster, creating new cluster",
-			zap.Error(err),
-			zap.String("serviceDNS", serviceDNS))
+			"error", err,
+			"serviceDNS", serviceDNS)
 		// This is not a fatal error - this node will form its own cluster
 		// that others can join later
 	} else {
-		log.Info("Successfully joined cluster", zap.Int("nodesJoined", joinCount))
+		log.Info("Successfully joined cluster", "nodesJoined", joinCount)
 	}
 
 	log.Info("Memberlist store initialized",
-		zap.Int("members", s.ml.NumMembers()),
-		zap.String("localNode", s.ml.LocalNode().Name))
+		"members", s.ml.NumMembers(),
+		"localNode", s.ml.LocalNode().Name)
 	return nil
 }
 
@@ -152,8 +151,8 @@ func (s *MemberlistStore) SaveAlertWithJobInfo(alert alertstore.Alert, status st
 
 	alertName := alert.Labels["alertname"]
 	log.Debug("Saving alert to memberlist store",
-		zap.String("alertname", alertName),
-		zap.String("status", status))
+		"alertname", alertName,
+		"status", status)
 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -164,15 +163,15 @@ func (s *MemberlistStore) SaveAlertWithJobInfo(alert alertstore.Alert, status st
 	// Keep list at or under limit
 	if len(s.alerts) > s.limit {
 		s.alerts = s.alerts[:s.limit]
-		log.Debug("Trimmed alerts to limit", zap.Int("limit", s.limit))
+		log.Debug("Trimmed alerts to limit", "limit", s.limit)
 	}
 
 	// Broadcast the new alert to other nodes if memberlist is initialized
 	data, err := json.Marshal(entry)
 	if err != nil {
 		log.Error("Failed to marshal alert for broadcast",
-			zap.Error(err),
-			zap.String("alertname", alertName))
+			"error", err,
+			"alertname", alertName)
 		return fmt.Errorf("failed to marshal alert: %w", err)
 	}
 
@@ -182,11 +181,11 @@ func (s *MemberlistStore) SaveAlertWithJobInfo(alert alertstore.Alert, status st
 			notify: nil,
 		})
 		log.Debug("Broadcast alert to cluster",
-			zap.String("alertname", alertName),
-			zap.Int("clusterSize", s.ml.NumMembers()))
+			"alertname", alertName,
+			"clusterSize", s.ml.NumMembers())
 	} else {
 		log.Debug("Skipping broadcast - memberlist not initialized",
-			zap.String("alertname", alertName))
+			"alertname", alertName)
 	}
 
 	return nil
@@ -198,9 +197,9 @@ func (s *MemberlistStore) GetAlerts(query string, limit int) ([]alertstore.Alert
 	defer s.mutex.RUnlock()
 
 	log.Debug("Getting alerts from store",
-		zap.String("query", query),
-		zap.Int("requestedLimit", limit),
-		zap.Int("totalAlerts", len(s.alerts)))
+		"query", query,
+		"requestedLimit", limit,
+		"totalAlerts", len(s.alerts))
 
 	if limit <= 0 || limit > len(s.alerts) {
 		limit = len(s.alerts)
@@ -217,7 +216,7 @@ func (s *MemberlistStore) GetAlerts(query string, limit int) ([]alertstore.Alert
 				JobInfo:   s.alerts[i].JobInfo,
 			})
 		}
-		log.Debug("Returning alerts with no query filter", zap.Int("resultCount", len(result)))
+		log.Debug("Returning alerts with no query filter", "resultCount", len(result))
 		return result, nil
 	}
 
@@ -240,8 +239,8 @@ func (s *MemberlistStore) GetAlerts(query string, limit int) ([]alertstore.Alert
 	}
 
 	log.Debug("Returning filtered alerts",
-		zap.String("query", query),
-		zap.Int("resultCount", len(result)))
+		"query", query,
+		"resultCount", len(result))
 	return result, nil
 }
 
@@ -249,8 +248,8 @@ func (s *MemberlistStore) GetAlerts(query string, limit int) ([]alertstore.Alert
 func (s *MemberlistStore) Close() error {
 	if s.ml != nil {
 		log.Info("Leaving memberlist cluster",
-			zap.String("node", s.ml.LocalNode().Name),
-			zap.Int("clusterSize", s.ml.NumMembers()))
+			"node", s.ml.LocalNode().Name,
+			"clusterSize", s.ml.NumMembers())
 		return s.ml.Leave(time.Second * 5)
 	}
 	log.Debug("No memberlist to close")
@@ -312,16 +311,16 @@ func (d *delegate) NotifyMsg(data []byte) {
 	var entry alertEntry
 	if err := json.Unmarshal(data, &entry); err != nil {
 		log.Error("Failed to unmarshal alert in NotifyMsg",
-			zap.Error(err),
-			zap.Int("dataLength", len(data)))
+			"error", err,
+			"dataLength", len(data))
 		return
 	}
 
 	alertName := entry.Alert.Labels["alertname"]
 	log.Debug("Received alert notification from cluster",
-		zap.String("alertname", alertName),
-		zap.String("status", entry.Status),
-		zap.Time("timestamp", entry.Timestamp))
+		"alertname", alertName,
+		"status", entry.Status,
+		"timestamp", entry.Timestamp)
 
 	// Add the alert to our local store
 	if d.store == nil {
@@ -340,8 +339,8 @@ func (d *delegate) NotifyMsg(data []byte) {
 				if newAlertname, ok2 := entry.Alert.Labels["alertname"]; ok2 && alertname == newAlertname {
 					// Already have this alert, skip it
 					log.Debug("Skipping duplicate alert",
-						zap.String("alertname", alertname),
-						zap.Time("timestamp", entry.Timestamp))
+							"alertname", alertname,
+							"timestamp", entry.Timestamp)
 					return
 				}
 			}
@@ -355,7 +354,7 @@ func (d *delegate) NotifyMsg(data []byte) {
 	if len(d.store.alerts) > d.store.limit {
 		d.store.alerts = d.store.alerts[:d.store.limit]
 		log.Debug("Trimmed alerts to limit after receiving new alert",
-			zap.Int("limit", d.store.limit))
+			"limit", d.store.limit)
 	}
 }
 
@@ -380,15 +379,15 @@ func (d *delegate) LocalState(join bool) []byte {
 	data, err := json.Marshal(d.store.alerts)
 	if err != nil {
 		log.Error("Failed to marshal local state",
-			zap.Error(err),
-			zap.Int("alertCount", len(d.store.alerts)),
-			zap.Bool("joinOperation", join))
+			"error", err,
+			"alertCount", len(d.store.alerts),
+			"joinOperation", join)
 		return []byte{}
 	}
 	log.Debug("Sending local state to remote node",
-		zap.Int("alertCount", len(d.store.alerts)),
-		zap.Bool("joinOperation", join),
-		zap.Int("dataBytes", len(data)))
+		"alertCount", len(d.store.alerts),
+		"joinOperation", join,
+		"dataBytes", len(data))
 	return data
 }
 
@@ -405,19 +404,19 @@ func (d *delegate) MergeRemoteState(buf []byte, join bool) {
 	}
 
 	log.Debug("Merging remote state",
-		zap.Int("bufferSize", len(buf)),
-		zap.Bool("joinOperation", join))
+		"bufferSize", len(buf),
+		"joinOperation", join)
 
 	var remoteAlerts []alertEntry
 	if err := json.Unmarshal(buf, &remoteAlerts); err != nil {
 		log.Error("Failed to unmarshal remote state",
-			zap.Error(err),
-			zap.Int("bufferSize", len(buf)))
+			"error", err,
+			"bufferSize", len(buf))
 		return
 	}
 
 	log.Debug("Unmarshalled remote alerts",
-		zap.Int("remoteAlertCount", len(remoteAlerts)))
+		"remoteAlertCount", len(remoteAlerts))
 
 	d.store.mutex.Lock()
 	defer d.store.mutex.Unlock()
@@ -446,8 +445,8 @@ func (d *delegate) MergeRemoteState(buf []byte, join bool) {
 
 	if newAlertCount > 0 {
 		log.Debug("Added new alerts from remote state",
-			zap.Int("newAlerts", newAlertCount),
-			zap.Int("totalAlerts", len(d.store.alerts)))
+			"newAlerts", newAlertCount,
+			"totalAlerts", len(d.store.alerts))
 	}
 
 	// Sort by timestamp (newest first)
@@ -460,8 +459,8 @@ func (d *delegate) MergeRemoteState(buf []byte, join bool) {
 		oldLength := len(d.store.alerts)
 		d.store.alerts = d.store.alerts[:d.store.limit]
 		log.Debug("Trimmed alerts to limit after merge",
-			zap.Int("limit", d.store.limit),
-			zap.Int("removed", oldLength-d.store.limit))
+			"limit", d.store.limit,
+			"removed", oldLength-d.store.limit)
 	}
 }
 
@@ -474,10 +473,10 @@ func (d *delegate) NotifyJoin(node *memberlist.Node) {
 	}
 
 	log.Info("Node joined the cluster",
-		zap.String("node", node.Name),
-		zap.String("address", node.Address()),
-		zap.Uint8("state", uint8(node.State)),
-		zap.Int("clusterSize", clusterSize))
+		"node", node.Name,
+		"address", node.Address(),
+		"state", uint8(node.State),
+		"clusterSize", clusterSize)
 }
 
 // NotifyLeave is invoked when a node leaves the cluster
@@ -489,18 +488,18 @@ func (d *delegate) NotifyLeave(node *memberlist.Node) {
 	}
 
 	log.Info("Node left the cluster",
-		zap.String("node", node.Name),
-		zap.String("address", node.Address()),
-		zap.Uint8("state", uint8(node.State)),
-		zap.Int("clusterSize", clusterSize))
+		"node", node.Name,
+		"address", node.Address(),
+		"state", uint8(node.State),
+		"clusterSize", clusterSize)
 }
 
 // NotifyUpdate is invoked when a node's metadata is updated
 func (d *delegate) NotifyUpdate(node *memberlist.Node) {
 	log.Debug("Node metadata updated",
-		zap.String("node", node.Name),
-		zap.String("address", node.Address()),
-		zap.Uint8("state", uint8(node.State)))
+		"node", node.Name,
+		"address", node.Address(),
+		"state", uint8(node.State))
 }
 
 // broadcast implements the memberlist.Broadcast interface

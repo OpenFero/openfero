@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	log "github.com/OpenFero/openfero/pkg/logging"
-	"go.uber.org/zap"
 )
 
 // BuildInfo contains information about the build
@@ -36,12 +35,12 @@ func SetBuildInfo(version, commit, date string) {
 // @Router /api/about [get]
 func AboutAPIHandler(w http.ResponseWriter, r *http.Request) {
 	log.Debug("Processing about API request",
-		zap.String("path", r.URL.Path),
-		zap.String("method", r.Method))
+		"path", r.URL.Path,
+		"method", r.Method)
 
 	w.Header().Set(ContentTypeHeader, ApplicationJSONVal)
 	if err := json.NewEncoder(w).Encode(buildInformation); err != nil {
-		log.Error("Failed to encode build info", zap.Error(err))
+		log.Error("Failed to encode build info", "error", err)
 		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}

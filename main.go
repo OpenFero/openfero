@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	operariusv1alpha1 "github.com/OpenFero/openfero/api/v1alpha1"
@@ -19,7 +18,6 @@ import (
 	"github.com/OpenFero/openfero/pkg/services"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
-	"go.uber.org/zap"
 
 	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,17 +38,7 @@ var (
 
 // initLogger initializes the logger with the given log level
 func initLogger(logLevel string) error {
-	var cfg zap.Config
-	switch strings.ToLower(logLevel) {
-	case "debug":
-		cfg = zap.NewDevelopmentConfig()
-	case "info":
-		cfg = zap.NewProductionConfig()
-	default:
-		return fmt.Errorf("invalid log level specified: %s", logLevel)
-	}
-
-	return log.SetConfig(cfg)
+	return log.SetLevel(logLevel)
 }
 
 // validateAuthConfig validates the authentication configuration
@@ -113,7 +101,7 @@ func main() {
 		log.Fatal("Could not set log configuration")
 	}
 
-	log.Info("Starting OpenFero", zap.String("version", version), zap.String("commit", commit), zap.String("date", date))
+	log.Info("Starting OpenFero", "version", version, "commit", commit, "date", date)
 
 	// Initialize the appropriate alert store based on configuration
 	var store alertstore.Store
@@ -126,11 +114,11 @@ func main() {
 
 	// Initialize the alert store
 	if err := store.Initialize(); err != nil {
-		log.Fatal("Failed to initialize alert store", zap.String("error", err.Error()))
+		log.Fatal("Failed to initialize alert store", "error", err)
 	}
 	defer func() {
 		if err := store.Close(); err != nil {
-			log.Error("Failed to close alert store", zap.Error(err))
+			log.Error("Failed to close alert store", "error", err)
 		}
 	}()
 
@@ -140,7 +128,7 @@ func main() {
 	// Get current namespace if not specified
 	currentNamespace, err := kubernetes.GetCurrentNamespace()
 	if err != nil {
-		log.Fatal("Current kubernetes namespace could not be found", zap.String("error", err.Error()))
+		log.Fatal("Current kubernetes namespace could not be found", "error", err)
 	}
 
 	// Set operarius namespace to current namespace if not specified
@@ -163,13 +151,13 @@ func main() {
 
 	// Validate authentication configuration
 	if authErr := validateAuthConfig(authConfig); authErr != nil {
-		log.Fatal("Invalid authentication configuration", zap.Error(authErr))
+		log.Fatal("Invalid authentication configuration", "error", authErr)
 	}
 
 	// Log authentication configuration (without sensitive data)
 	if authConfig.Method != handlers.AuthMethodNone {
 		log.Info("Authentication enabled for webhook endpoint",
-			zap.String("method", string(authConfig.Method)))
+			"method", string(authConfig.Method))
 	} else {
 		log.Info("No authentication configured for webhook endpoint")
 	}
@@ -183,11 +171,11 @@ func main() {
 
 	// Initialize Operarius CRD support
 	log.Info("Initializing Operarius CRD support",
-		zap.String("namespace", *operariusNamespace))
+		"namespace", *operariusNamespace)
 
 	operariusClient, err := kubernetes.NewOperariusClient(kubeconfig, *operariusNamespace)
 	if err != nil {
-		log.Fatal("Failed to create Operarius client", zap.Error(err))
+		log.Fatal("Failed to create Operarius client", "error", err)
 	}
 
 	// Initialize informer and wait for cache sync
@@ -195,7 +183,7 @@ func main() {
 	_, err = operariusClient.InitOperariusInformer(ctx)
 	if err != nil {
 		log.Warn("Failed to initialize Operarius informer, falling back to API calls",
-			zap.Error(err))
+			"error", err)
 		metadata.OperariusSyncErrorsTotal.Inc()
 	}
 
@@ -212,7 +200,7 @@ func main() {
 			"openfero.io/managed-by": "openfero",
 		},
 	}
-	log.Info("Using Operarius job selector", zap.String("selector", metav1.FormatLabelSelector(jobSelector)))
+	log.Info("Using Operarius job selector", "selector", metav1.FormatLabelSelector(jobSelector))
 
 	// Initialize Job informer with update callback
 	// We watch jobs in the same namespace as Operarius CRDs
@@ -225,17 +213,17 @@ func main() {
 				operarius, err := operariusService.GetOperarius(ctx, operariusName, newJob.Namespace)
 				if err != nil {
 					log.Error("Failed to get Operarius for job update",
-						zap.String("operarius", operariusName),
-						zap.Error(err))
+						"operarius", operariusName,
+						"error", err)
 					return
 				}
 
 				// Update status based on job status
 				if err := operariusService.UpdateOperariusStatusFromJob(ctx, operarius, newJob); err != nil {
 					log.Error("Failed to update Operarius status from job",
-						zap.String("operarius", operariusName),
-						zap.String("job", newJob.Name),
-						zap.Error(err))
+						"operarius", operariusName,
+						"job", newJob.Name,
+						"error", err)
 				}
 			}
 		}
@@ -273,7 +261,7 @@ func main() {
 	http.HandleFunc("GET /startupz", server.StartupzGetHandler)
 	http.HandleFunc("GET /alertStore", func(w http.ResponseWriter, r *http.Request) {
 		log.Warn("Deprecated: /alertStore endpoint is deprecated, use /api/alerts instead",
-			zap.String("remoteAddr", r.RemoteAddr))
+			"remoteAddr", r.RemoteAddr)
 		server.AlertStoreGetHandler(w, r)
 	})
 	http.HandleFunc("GET /alerts", server.AlertsGetHandler)
@@ -309,6 +297,6 @@ func main() {
 
 	log.Info("Starting server on " + *addr)
 	if err := srv.ListenAndServe(); err != nil {
-		log.Fatal("error starting server: ", zap.String("error", err.Error()))
+		log.Fatal("error starting server", "error", err)
 	}
 }

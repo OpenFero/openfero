@@ -7,7 +7,6 @@ import (
 
 	log "github.com/OpenFero/openfero/pkg/logging"
 	"github.com/OpenFero/openfero/pkg/models"
-	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -20,9 +19,9 @@ import (
 // @Router /api/jobs [get]
 func (s *Server) JobsAPIHandler(w http.ResponseWriter, r *http.Request) {
 	log.Debug("Processing jobs API request",
-		zap.String("path", r.URL.Path),
-		zap.String("method", r.Method),
-		zap.String("remoteAddr", r.RemoteAddr))
+		"path", r.URL.Path,
+		"method", r.Method,
+		"remoteAddr", r.RemoteAddr)
 
 	var jobInfos []models.JobInfo
 
@@ -30,9 +29,9 @@ func (s *Server) JobsAPIHandler(w http.ResponseWriter, r *http.Request) {
 		// Fetch Operarii
 		operarii, err := s.OperariusService.GetOperariiForNamespace(r.Context(), "")
 		if err != nil {
-			log.Error("Failed to get Operarii", zap.Error(err))
+			log.Error("Failed to get Operarii", "error", err)
 		} else {
-			log.Debug("Retrieved Operarii", zap.Int("count", len(operarii)))
+			log.Debug("Retrieved Operarii", "count", len(operarii))
 			for _, op := range operarii {
 				image := "unknown"
 				if len(op.Spec.JobTemplate.Spec.Template.Spec.Containers) > 0 {
@@ -84,6 +83,6 @@ func (s *Server) JobsAPIHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set(ContentTypeHeader, ApplicationJSONVal)
 	if err := json.NewEncoder(w).Encode(jobInfos); err != nil {
-		log.Error("Failed to encode jobs response", zap.Error(err))
+		log.Error("Failed to encode jobs response", "error", err)
 	}
 }

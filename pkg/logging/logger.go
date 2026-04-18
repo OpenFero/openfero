@@ -1,44 +1,54 @@
 package logging
 
 import (
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
+	"log/slog"
+	"os"
 )
 
-var zapLog *zap.Logger
+// Level constants matching the levels used across the codebase.
+const (
+	LevelDebug = slog.LevelDebug
+	LevelInfo  = slog.LevelInfo
+	LevelWarn  = slog.LevelWarn
+	LevelError = slog.LevelError
+)
 
-// SetConfig sets the logger configuration
-func SetConfig(config zap.Config) error {
-	var err error
-	encoderConfig := zap.NewProductionEncoderConfig()
-	encoderConfig.StacktraceKey = "" // to hide stacktrace info
-	encoderConfig.TimeKey = "timestamp"
-	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder // format timestamp to ISO8601
-	config.EncoderConfig = encoderConfig
-	config.Encoding = "json" // set encoding to JSON
-	zapLog, err = config.Build(zap.AddCallerSkip(1))
-	if err != nil {
-		return err
+var level = new(slog.LevelVar) // default: Info
+
+// SetLevel configures the minimum log level ("debug" or "info").
+func SetLevel(logLevel string) error {
+	switch logLevel {
+	case "debug":
+		level.Set(slog.LevelDebug)
+	default:
+		level.Set(slog.LevelInfo)
 	}
+	h := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level:     level,
+		AddSource: true,
+	})
+	slog.SetDefault(slog.New(h))
 	return nil
 }
 
-func Info(message string, fields ...zap.Field) {
-	zapLog.Info(message, fields...)
+func Info(message string, args ...any) {
+	slog.Info(message, args...)
 }
 
-func Debug(message string, fields ...zap.Field) {
-	zapLog.Debug(message, fields...)
+func Debug(message string, args ...any) {
+	slog.Debug(message, args...)
 }
 
-func Warn(message string, fields ...zap.Field) {
-	zapLog.Warn(message, fields...)
+func Warn(message string, args ...any) {
+	slog.Warn(message, args...)
 }
 
-func Error(message string, fields ...zap.Field) {
-	zapLog.Error(message, fields...)
+func Error(message string, args ...any) {
+	slog.Error(message, args...)
 }
 
-func Fatal(message string, fields ...zap.Field) {
-	zapLog.Fatal(message, fields...)
+// Fatal logs at Error level and exits with code 1.
+func Fatal(message string, args ...any) {
+	slog.Error(message, args...)
+	os.Exit(1)
 }

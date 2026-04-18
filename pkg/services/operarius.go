@@ -20,7 +20,6 @@ import (
 	log "github.com/OpenFero/openfero/pkg/logging"
 	"github.com/OpenFero/openfero/pkg/models"
 	"github.com/OpenFero/openfero/pkg/utils"
-	"go.uber.org/zap"
 )
 
 // OperariusClientInterface defines the interface for Operarius client operations
@@ -368,7 +367,7 @@ func (s *OperariusService) GetOperariiForNamespace(ctx context.Context, namespac
 	if err != nil {
 		// Fallback to cache if API call fails (e.g., network issues)
 		log.Warn("Failed to list Operarii from API, trying cache",
-			zap.Error(err))
+			"error", err)
 		operarii, err = s.operariusClient.List()
 		if err != nil {
 			return nil, fmt.Errorf("failed to list Operarii: %w", err)
@@ -376,8 +375,8 @@ func (s *OperariusService) GetOperariiForNamespace(ctx context.Context, namespac
 	}
 
 	log.Debug("Retrieved Operarii",
-		zap.String("namespace", namespace),
-		zap.Int("count", len(operarii)))
+		"namespace", namespace,
+		"count", len(operarii))
 
 	return operarii, nil
 }
@@ -398,7 +397,7 @@ func (s *OperariusService) UpdateOperariusDedupStatus(ctx context.Context, opera
 	}
 
 	log.Debug("Updated Operarius dedup status",
-		zap.String("operarius", operarius.Name))
+		"operarius", operarius.Name)
 
 	return nil
 }
@@ -423,9 +422,9 @@ func (s *OperariusService) UpdateOperariusStatus(ctx context.Context, operarius 
 	}
 
 	log.Info("Updated Operarius status",
-		zap.String("operarius", operarius.Name),
-		zap.String("jobName", jobName),
-		zap.Int32("executionCount", operarius.Status.ExecutionCount))
+		"operarius", operarius.Name,
+		"jobName", jobName,
+		"executionCount", operarius.Status.ExecutionCount)
 
 	if s.broadcaster != nil {
 		s.broadcaster(*operarius)
@@ -477,9 +476,9 @@ func (s *OperariusService) UpdateOperariusStatusFromJob(ctx context.Context, ope
 	}
 
 	log.Info("Updated Operarius status from job",
-		zap.String("operarius", operarius.Name),
-		zap.String("job", job.Name),
-		zap.String("status", newStatus))
+		"operarius", operarius.Name,
+		"job", job.Name,
+		"status", newStatus)
 
 	if s.broadcaster != nil {
 		s.broadcaster(*operarius)

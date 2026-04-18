@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	log "github.com/OpenFero/openfero/pkg/logging"
-	"go.uber.org/zap"
 )
 
 // FrontendFS holds the embedded Vue.js frontend files
@@ -26,7 +25,7 @@ func NewFrontendHandler(frontendFS embed.FS) http.Handler {
 	// Get the dist subdirectory from the embedded filesystem
 	distFS, err := fs.Sub(frontendFS, "frontend/dist")
 	if err != nil {
-		log.Error("Failed to get frontend dist subdirectory", zap.Error(err))
+		log.Error("Failed to get frontend dist subdirectory", "error", err)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Frontend not available", http.StatusInternalServerError)
 		})
@@ -35,7 +34,7 @@ func NewFrontendHandler(frontendFS embed.FS) http.Handler {
 	// Read index.html for SPA fallback
 	indexHTML, err := fs.ReadFile(distFS, "index.html")
 	if err != nil {
-		log.Error("Failed to read index.html", zap.Error(err))
+		log.Error("Failed to read index.html", "error", err)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Frontend not available", http.StatusInternalServerError)
 		})
@@ -56,8 +55,8 @@ func (h *frontendHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Debug("Frontend request",
-		zap.String("path", urlPath),
-		zap.String("method", r.Method))
+		"path", urlPath,
+		"method", r.Method)
 
 	// Check if this is an API route (should not be handled here)
 	if isAPIRoute(urlPath) {
@@ -75,7 +74,7 @@ func (h *frontendHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set(ContentTypeHeader, "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	if _, err := w.Write(h.indexHTML); err != nil {
-		log.Error("Failed to write index.html", zap.Error(err))
+		log.Error("Failed to write index.html", "error", err)
 	}
 }
 
