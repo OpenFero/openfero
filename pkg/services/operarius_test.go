@@ -699,7 +699,7 @@ func TestOperariusService_TemplateProcessing_EdgeCases(t *testing.T) {
 	tests := []struct {
 		name         string
 		template     string
-		templateData interface{}
+		templateData any
 		want         string
 		wantErr      bool
 	}{
@@ -1056,8 +1056,10 @@ func TestOperariusService_DeduplicationDisabled(t *testing.T) {
 }
 
 // Helper functions
+//
+//go:fix inline
 func int32Ptr(i int32) *int32 {
-	return &i
+	return new(i)
 }
 
 func getEnvValue(envVars []corev1.EnvVar, name string) string {

@@ -47,7 +47,7 @@ func prepopulateStore(store *MemoryStore, count int) {
 	}
 	statuses := []string{"firing", "resolved"}
 
-	for i := 0; i < count; i++ {
+	for i := range count {
 		alert := benchmarkAlertEntry(alerts[i%len(alerts)])
 		alert.Labels["pod"] = fmt.Sprintf("pod-%d", i)
 		status := statuses[i%2]

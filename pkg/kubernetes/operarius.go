@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	operariusv1alpha1 "github.com/OpenFero/openfero/api/v1alpha1"
@@ -29,7 +28,6 @@ type OperariusClient struct {
 	restClient rest.Interface
 	namespace  string
 	store      cache.Store
-	storeMu    sync.RWMutex
 	informer   cache.SharedIndexInformer
 	scheme     *runtime.Scheme
 }
@@ -43,12 +41,12 @@ func NewOperariusClient(kubeconfig *string, namespace string) (*OperariusClient,
 
 	// Create scheme and register Operarius types
 	sch := runtime.NewScheme()
-	if err := operariusv1alpha1.AddToScheme(sch); err != nil {
-		return nil, fmt.Errorf("failed to add Operarius to scheme: %w", err)
+	if schemeErr := operariusv1alpha1.AddToScheme(sch); schemeErr != nil {
+		return nil, fmt.Errorf("failed to add Operarius to scheme: %w", schemeErr)
 	}
 	// Add standard k8s types to scheme (needed for REST client)
-	if err := scheme.AddToScheme(sch); err != nil {
-		return nil, fmt.Errorf("failed to add k8s types to scheme: %w", err)
+	if schemeErr := scheme.AddToScheme(sch); schemeErr != nil {
+		return nil, fmt.Errorf("failed to add k8s types to scheme: %w", schemeErr)
 	}
 	// Register ListOptions for ParameterCodec
 	sch.AddKnownTypes(metav1.SchemeGroupVersion, &metav1.ListOptions{})
@@ -62,7 +60,7 @@ func NewOperariusClient(kubeconfig *string, namespace string) (*OperariusClient,
 	}
 
 	// Create REST client for watching
-	config.ContentConfig.GroupVersion = &operariusv1alpha1.GroupVersion
+	config.GroupVersion = &operariusv1alpha1.GroupVersion
 	config.APIPath = "/apis"
 	config.NegotiatedSerializer = serializer.NewCodecFactory(sch).WithoutConversion()
 	config.UserAgent = rest.DefaultKubernetesUserAgent()
@@ -92,9 +90,9 @@ func getRestConfig(kubeconfig *string) (*rest.Config, error) {
 		}
 
 		if kubeconfigPath == "" {
-			if home, err := os.UserHomeDir(); err == nil {
+			if home, homeErr := os.UserHomeDir(); homeErr == nil {
 				defaultPath := filepath.Join(home, ".kube", "config")
-				if _, err := os.Stat(defaultPath); err == nil {
+				if _, statErr := os.Stat(defaultPath); statErr == nil {
 					kubeconfigPath = defaultPath
 				}
 			}
@@ -112,17 +110,8 @@ func getRestConfig(kubeconfig *string) (*rest.Config, error) {
 	return config, nil
 }
 
-// InitOperariusInformer initializes the Operarius informer and returns the store
-func (c *OperariusClient) InitOperariusInformer(ctx context.Context, restConfig *rest.Config, kubeconfigPath *string) (cache.Store, error) {
-	// Get REST config if not provided
-	if restConfig == nil {
-		var err error
-		restConfig, err = getRestConfig(kubeconfigPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get REST config: %w", err)
-		}
-	}
-
+// InitOperariusInformer initializes the Operarius informer and returns the store.
+func (c *OperariusClient) InitOperariusInformer(ctx context.Context) (cache.Store, error) {
 	// Create list/watch functions using REST client
 	parameterCodec := runtime.NewParameterCodec(c.scheme)
 	listFunc := func(options metav1.ListOptions) (runtime.Object, error) {
@@ -158,7 +147,7 @@ func (c *OperariusClient) InitOperariusInformer(ctx context.Context, restConfig 
 
 	// Add event handlers
 	_, handlerErr := c.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+		AddFunc: func(obj any) {
 			operarius, ok := obj.(*operariusv1alpha1.Operarius)
 			if ok {
 				log.Debug("Operarius added to store",
@@ -168,7 +157,7 @@ func (c *OperariusClient) InitOperariusInformer(ctx context.Context, restConfig 
 				metadata.OperariusItemsLoaded.Inc()
 			}
 		},
-		UpdateFunc: func(old, new interface{}) {
+		UpdateFunc: func(old, new any) {
 			oldOp, oldOk := old.(*operariusv1alpha1.Operarius)
 			newOp, newOk := new.(*operariusv1alpha1.Operarius)
 			if oldOk && newOk {
@@ -181,7 +170,7 @@ func (c *OperariusClient) InitOperariusInformer(ctx context.Context, restConfig 
 					zap.String("namespace", newOp.Namespace))
 			}
 		},
-		DeleteFunc: func(obj interface{}) {
+		DeleteFunc: func(obj any) {
 			operarius, ok := obj.(*operariusv1alpha1.Operarius)
 			if ok {
 				log.Debug("Operarius removed from store",
@@ -265,7 +254,7 @@ func (c *OperariusClient) Get(name string) (*operariusv1alpha1.Operarius, error)
 		return nil, fmt.Errorf("failed to get Operarius: %w", err)
 	}
 	if !exists {
-		return nil, fmt.Errorf("Operarius %s not found", name)
+		return nil, fmt.Errorf("operarius %s not found", name)
 	}
 
 	operarius, ok := obj.(*operariusv1alpha1.Operarius)

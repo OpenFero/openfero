@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 	"text/template"
 	"time"
@@ -139,14 +140,10 @@ func (s *OperariusService) matchesHookMessage(operarius operariusv1alpha1.Operar
 	// Check additional labels against common labels and first alert labels
 	labelsToCheck := make(map[string]string)
 	// Start with common labels
-	for k, v := range hookMessage.CommonLabels {
-		labelsToCheck[k] = v
-	}
+	maps.Copy(labelsToCheck, hookMessage.CommonLabels)
 	// Override with first alert's labels if available
 	if len(hookMessage.Alerts) > 0 {
-		for k, v := range hookMessage.Alerts[0].Labels {
-			labelsToCheck[k] = v
-		}
+		maps.Copy(labelsToCheck, hookMessage.Alerts[0].Labels)
 	}
 
 	for key, value := range selector.Labels {
@@ -186,12 +183,8 @@ func (s *OperariusService) CreateJobFromOperarius(ctx context.Context, operarius
 	}
 
 	// Copy labels and annotations from template ObjectMeta
-	for k, v := range jobTemplate.Labels {
-		job.Labels[k] = v
-	}
-	for k, v := range jobTemplate.Annotations {
-		job.Annotations[k] = v
-	}
+	maps.Copy(job.Labels, jobTemplate.Labels)
+	maps.Copy(job.Annotations, jobTemplate.Annotations)
 
 	// Add OpenFero-specific labels
 	job.Labels["openfero.io/operarius"] = operarius.Name
@@ -305,7 +298,7 @@ func (s *OperariusService) applyTemplateVariables(job *batchv1.Job, hookMessage 
 }
 
 // processTemplate processes a Go template string with the given data
-func (s *OperariusService) processTemplate(templateStr string, data interface{}) (string, error) {
+func (s *OperariusService) processTemplate(templateStr string, data any) (string, error) {
 	// Skip processing if no template variables found
 	if !strings.Contains(templateStr, "{{") {
 		return templateStr, nil

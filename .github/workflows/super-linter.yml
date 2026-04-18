@@ -58,14 +58,32 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Set up Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        # Required so the //go:embed frontend/dist directive in main.go can be
+        # type-checked by golangci-lint without a "no matching files found" error.
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
       - name: Lint Code Base
-        uses: super-linter/super-linter/slim@61abc07d755095a68f4987d1c2c3d1d64408f1f9 # v8.5.0
+        uses: super-linter/super-linter/slim@9e863354e3ff62e0727d37183162c4a88873df41 # v8.6.0
         env:
           VALIDATE_ALL_CODEBASE: false
           VALIDATE_CHECKOV: false
           VALIDATE_YAML: false
           # Go linting via golangci-lint using .github/linters/.golangci.yml
-          VALIDATE_GO_MODULES: false # Avoid duplicate runs across modules
+          # Disable file-mode VALIDATE_GO to avoid "named files must all be in one
+          # directory" typechecking errors. VALIDATE_GO_MODULES (module-aware) runs
+          # by default and handles changes spanning multiple Go packages correctly.
+          VALIDATE_GO: false
           VALIDATE_JAVASCRIPT_ES: false # Disable ESLint in favor of Biome
           VALIDATE_JSX: false
           VALIDATE_TSX: false # Disable ESLint in favor of Biome

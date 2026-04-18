@@ -42,8 +42,8 @@ var upgrader = websocket.Upgrader{
 
 // WSMessage represents a WebSocket message
 type WSMessage struct {
-	Type string      `json:"type"`
-	Data interface{} `json:"data"`
+	Type string `json:"type"`
+	Data any    `json:"data"`
 }
 
 // WSClient represents a WebSocket client connection
@@ -116,7 +116,7 @@ func (h *WSHub) run() {
 }
 
 // Broadcast sends a message to all connected WebSocket clients
-func (h *WSHub) Broadcast(msgType string, data interface{}) {
+func (h *WSHub) Broadcast(msgType string, data any) {
 	msg := WSMessage{Type: msgType, Data: data}
 	jsonData, err := json.Marshal(msg)
 	if err != nil {
@@ -182,7 +182,7 @@ func (c *WSClient) writePump() {
 
 			// Add queued messages to the current WebSocket message
 			n := len(c.send)
-			for i := 0; i < n; i++ {
+			for range n {
 				_, _ = w.Write([]byte{'\n'})
 				_, _ = w.Write(<-c.send)
 			}
