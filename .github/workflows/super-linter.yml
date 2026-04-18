@@ -65,9 +65,10 @@ jobs:
           VALIDATE_CHECKOV: false
           VALIDATE_YAML: false
           # Go linting via golangci-lint using .github/linters/.golangci.yml
-          # Use module-aware mode to avoid "named files must all be in one directory" errors
+          # Disable file-mode VALIDATE_GO to avoid "named files must all be in one
+          # directory" typechecking errors. VALIDATE_GO_MODULES (module-aware) runs
+          # by default and handles changes spanning multiple Go packages correctly.
           VALIDATE_GO: false
-          VALIDATE_GO_MODULES: true
           VALIDATE_JAVASCRIPT_ES: false # Disable ESLint in favor of Biome
           VALIDATE_JSX: false
           VALIDATE_TSX: false # Disable ESLint in favor of Biome
