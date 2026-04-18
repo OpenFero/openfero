@@ -209,7 +209,7 @@ BENCH_TIME ?= 5s
 BENCH_TIMEOUT ?= 30m
 BENCH_PATTERN ?= .
 GO_OLD ?= 1.25.6
-GO_NEW ?= 1.26
+GO_NEW ?= 1.26.2
 
 .PHONY: benchmark
 benchmark: ## Run Go benchmarks locally
