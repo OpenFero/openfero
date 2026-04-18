@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+# Cancel in-progress runs for the same PR/branch when a new commit is pushed.
+# On main we keep runs to avoid cancelling release-relevant pipelines.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   check-changes:
     name: Check for Go changes
@@ -86,8 +92,22 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
+      - name: Verify go.mod and go.sum are tidy
+        run: |
+          go mod tidy
+          if ! git diff --exit-code go.mod go.sum; then
+            echo "::error::go.mod or go.sum is not tidy. Run 'go mod tidy' locally and commit the changes."
+            exit 1
+          fi
+
       - name: Run tests
-        run: go test -v ./...
+        run: go test -v -count=1 ./...
 
       - name: Run tests with race detection
-        run: go test -race -v ./...
+        run: go test -race -v -count=1 ./...
+
+      - name: Run govulncheck
+        uses: golang/govulncheck-action@b625fbe08f3bccbe446d94fbf87fcc875a4f50ee # v1.0.4
+        with:
+          go-version-file: go.mod
+          check-latest: true
