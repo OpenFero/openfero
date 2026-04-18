@@ -34,6 +34,11 @@ on:
 permissions:
   contents: read
 
+# Cancel superseded lint runs on the same PR/branch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   run-lint:
     permissions:
@@ -59,8 +64,8 @@ jobs:
           VALIDATE_ALL_CODEBASE: false
           VALIDATE_CHECKOV: false
           VALIDATE_YAML: false
-          VALIDATE_GO: false
-          VALIDATE_GO_MODULES: false # Go linting handled by go-tests.yml workflow
+          # Go linting via golangci-lint using .github/linters/.golangci.yml
+          VALIDATE_GO_MODULES: false # Avoid duplicate runs across modules
           VALIDATE_JAVASCRIPT_ES: false # Disable ESLint in favor of Biome
           VALIDATE_JSX: false
           VALIDATE_TSX: false # Disable ESLint in favor of Biome
