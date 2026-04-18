@@ -110,16 +110,8 @@ func getRestConfig(kubeconfig *string) (*rest.Config, error) {
 	return config, nil
 }
 
-// InitOperariusInformer initializes the Operarius informer and returns the store
-func (c *OperariusClient) InitOperariusInformer(ctx context.Context, restConfig *rest.Config, kubeconfigPath *string) (cache.Store, error) {
-	// Get REST config if not provided
-	if restConfig == nil {
-		var err error
-		restConfig, err = getRestConfig(kubeconfigPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get REST config: %w", err)
-		}
-	}
+// InitOperariusInformer initializes the Operarius informer and returns the store.
+func (c *OperariusClient) InitOperariusInformer(ctx context.Context) (cache.Store, error) {
 	// Create list/watch functions using REST client
 	parameterCodec := runtime.NewParameterCodec(c.scheme)
 	listFunc := func(options metav1.ListOptions) (runtime.Object, error) {

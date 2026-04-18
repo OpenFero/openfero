@@ -162,8 +162,8 @@ func main() {
 	}
 
 	// Validate authentication configuration
-	if err := validateAuthConfig(authConfig); err != nil {
-		log.Fatal("Invalid authentication configuration", zap.Error(err))
+	if authErr := validateAuthConfig(authConfig); authErr != nil {
+		log.Fatal("Invalid authentication configuration", zap.Error(authErr))
 	}
 
 	// Log authentication configuration (without sensitive data)
@@ -192,7 +192,7 @@ func main() {
 
 	// Initialize informer and wait for cache sync
 	ctx := context.Background()
-	_, err = operariusClient.InitOperariusInformer(ctx, nil, kubeconfig)
+	_, err = operariusClient.InitOperariusInformer(ctx)
 	if err != nil {
 		log.Warn("Failed to initialize Operarius informer, falling back to API calls",
 			zap.Error(err))
