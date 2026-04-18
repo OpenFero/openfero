@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -199,13 +200,7 @@ func TestSaveAlert(t *testing.T) {
 
 				// Check that each expected value is present (ignoring order)
 				for _, expected := range expectedValues {
-					found := false
-					for _, actual := range actualValues {
-						if expected == actual {
-							found = true
-							break
-						}
-					}
+					found := slices.Contains(actualValues, expected)
 					if !found {
 						t.Errorf("SaveAlert() missing expected label value %s=%s", key, expected)
 					}

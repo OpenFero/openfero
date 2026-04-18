@@ -21,7 +21,7 @@ import (
 func benchmarkOperarii(count int) []operariusv1alpha1.Operarius {
 	enabled := true
 	operarii := make([]operariusv1alpha1.Operarius, count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		labels := map[string]string{
 			"severity": "warning",
 		}
@@ -405,7 +405,7 @@ func BenchmarkCreateJobFromOperarius_ManyLabels(b *testing.B) {
 
 	// Create a hook message with many labels to stress env var injection
 	hookMsg := benchmarkHookMessage("KubeQuotaAlmostFull")
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		hookMsg.Alerts[0].Labels[fmt.Sprintf("custom_label_%d", i)] = fmt.Sprintf("value_%d", i)
 	}
 	ctx := context.Background()
@@ -465,7 +465,7 @@ func BenchmarkCheckDeduplication_Enabled_WithExistingJobs(b *testing.B) {
 	ctx := context.Background()
 
 	// Create some existing jobs that match
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("existing-job-%d", i),

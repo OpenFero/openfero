@@ -158,7 +158,7 @@ func (c *OperariusClient) InitOperariusInformer(ctx context.Context, restConfig 
 
 	// Add event handlers
 	_, handlerErr := c.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+		AddFunc: func(obj any) {
 			operarius, ok := obj.(*operariusv1alpha1.Operarius)
 			if ok {
 				log.Debug("Operarius added to store",
@@ -168,7 +168,7 @@ func (c *OperariusClient) InitOperariusInformer(ctx context.Context, restConfig 
 				metadata.OperariusItemsLoaded.Inc()
 			}
 		},
-		UpdateFunc: func(old, new interface{}) {
+		UpdateFunc: func(old, new any) {
 			oldOp, oldOk := old.(*operariusv1alpha1.Operarius)
 			newOp, newOk := new.(*operariusv1alpha1.Operarius)
 			if oldOk && newOk {
@@ -181,7 +181,7 @@ func (c *OperariusClient) InitOperariusInformer(ctx context.Context, restConfig 
 					zap.String("namespace", newOp.Namespace))
 			}
 		},
-		DeleteFunc: func(obj interface{}) {
+		DeleteFunc: func(obj any) {
 			operarius, ok := obj.(*operariusv1alpha1.Operarius)
 			if ok {
 				log.Debug("Operarius removed from store",

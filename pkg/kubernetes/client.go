@@ -110,7 +110,7 @@ func InitJobInformer(clientset *kubernetes.Clientset, jobDestinationNamespace st
 
 	// Add event handlers
 	if _, err := jobInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+		AddFunc: func(obj any) {
 			job := obj.(*batchv1.Job)
 			log.Debug("Job added", zap.String("job", job.Name), zap.String("namespace", job.Namespace))
 			metadata.JobsCreatedTotal.Inc()
@@ -118,7 +118,7 @@ func InitJobInformer(clientset *kubernetes.Clientset, jobDestinationNamespace st
 				updateFunc(nil, job)
 			}
 		},
-		UpdateFunc: func(old, new interface{}) {
+		UpdateFunc: func(old, new any) {
 			oldJob := old.(*batchv1.Job)
 			newJob := new.(*batchv1.Job)
 			if newJob.Status.Succeeded > 0 && oldJob.Status.Succeeded == 0 {
@@ -133,7 +133,7 @@ func InitJobInformer(clientset *kubernetes.Clientset, jobDestinationNamespace st
 				updateFunc(oldJob, newJob)
 			}
 		},
-		DeleteFunc: func(obj interface{}) {
+		DeleteFunc: func(obj any) {
 			job := obj.(*batchv1.Job)
 			log.Debug("Job deleted", zap.String("job", job.Name), zap.String("namespace", job.Namespace))
 		},

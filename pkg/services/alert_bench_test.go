@@ -83,7 +83,7 @@ func BenchmarkSaveAlert_StoreAtCapacity(b *testing.B) {
 	defer store.Close()
 
 	// Fill the store to capacity
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		alert := benchmarkAlertStoreAlert("PreFillAlert")
 		SaveAlert(store, alert, "firing")
 	}

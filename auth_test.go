@@ -306,7 +306,7 @@ func TestIntegration_AlertsPostHandler_WithAuth(t *testing.T) {
 		dec := json.NewDecoder(r.Body)
 		defer r.Body.Close()
 
-		var message interface{}
+		var message any
 		if err := dec.Decode(&message); err != nil {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
