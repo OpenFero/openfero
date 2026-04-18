@@ -58,6 +58,21 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Set up Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        # Required so the //go:embed frontend/dist directive in main.go can be
+        # type-checked by golangci-lint without a "no matching files found" error.
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
       - name: Lint Code Base
         uses: super-linter/super-linter/slim@9e863354e3ff62e0727d37183162c4a88873df41 # v8.6.0
         env:

@@ -36,9 +36,9 @@ func InitKubeClient(kubeconfig *string) *kubernetes.Clientset {
 
 		kubeconfigPath := *kubeconfig
 		if kubeconfigPath == "" {
-			if home, err := os.UserHomeDir(); err == nil {
+			if home, homeErr := os.UserHomeDir(); homeErr == nil {
 				defaultPath := filepath.Join(home, ".kube", "config")
-				if _, err := os.Stat(defaultPath); err == nil {
+				if _, statErr := os.Stat(defaultPath); statErr == nil {
 					kubeconfigPath = defaultPath
 				}
 			}

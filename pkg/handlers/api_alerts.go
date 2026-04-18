@@ -224,8 +224,8 @@ func (s *Server) AlertStoreGetHandler(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			job, err := s.KubeClient.Clientset.BatchV1().Jobs(alerts[i].JobInfo.Namespace).Get(ctx, alerts[i].JobInfo.JobName, metav1.GetOptions{})
-			if err == nil {
+			job, jobErr := s.KubeClient.Clientset.BatchV1().Jobs(alerts[i].JobInfo.Namespace).Get(ctx, alerts[i].JobInfo.JobName, metav1.GetOptions{})
+			if jobErr == nil {
 				// Determine status
 				status := "Pending"
 				if job.Status.Succeeded > 0 {

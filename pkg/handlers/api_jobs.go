@@ -83,5 +83,7 @@ func (s *Server) JobsAPIHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set(ContentTypeHeader, ApplicationJSONVal)
-	json.NewEncoder(w).Encode(jobInfos)
+	if err := json.NewEncoder(w).Encode(jobInfos); err != nil {
+		log.Error("Failed to encode jobs response", zap.Error(err))
+	}
 }
