@@ -6,9 +6,9 @@
 #
 # Usage:
 #   docker build --build-arg GO_VERSION=1.25.6 -t openfero-bench:go1.25.6 -f hack/benchmark.dockerfile .
-#   docker build --build-arg GO_VERSION=1.26 -t openfero-bench:go1.26 -f hack/benchmark.dockerfile .
+#   docker build --build-arg GO_VERSION=1.26.2 -t openfero-bench:go1.26.2 -f hack/benchmark.dockerfile .
 
-ARG GO_VERSION=1.25.6
+ARG GO_VERSION=1.26.2
 
 FROM golang:${GO_VERSION}-bookworm
 
