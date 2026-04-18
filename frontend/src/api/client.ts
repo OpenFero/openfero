@@ -47,7 +47,7 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
   const contentType = response.headers.get('content-type')
 
   // Check if response is JSON
-  if (!contentType || !contentType.includes('application/json')) {
+  if (!contentType?.includes('application/json')) {
     // If we got HTML (like 404 page or nginx error), provide helpful message
     const text = await response.text()
     if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
