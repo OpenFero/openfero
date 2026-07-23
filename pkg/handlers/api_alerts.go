@@ -3,11 +3,13 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"sync/atomic"
 	"time"
 
+	operariusv1alpha1 "github.com/OpenFero/openfero/api/v1alpha1"
 	"github.com/OpenFero/openfero/pkg/alertstore"
 	"github.com/OpenFero/openfero/pkg/kubernetes"
 	log "github.com/OpenFero/openfero/pkg/logging"
@@ -114,36 +116,24 @@ func (s *Server) handleOperariusBasedJobs(ctx context.Context, hookMessage model
 					"operarius", operarius.Name,
 					"groupKey", hookMessage.GroupKey)
 
-				if err := s.OperariusService.UpdateOperariusDedupStatus(ctx, operarius); err != nil {
-					log.Warn("Failed to update Operarius dedup status",
-						"error", err,
-						"operarius", operarius.Name)
-				}
-
-				var lastExecutionTime *time.Time
-				if operarius.Status.LastExecutionTime != nil {
-					t := operarius.Status.LastExecutionTime.Time
-					lastExecutionTime = &t
-				}
-
-				jobInfo = &alertstore.JobInfo{
-					JobName:             "N/A (Deduplicated)",
-					Namespace:           operarius.Namespace,
-					OperariusName:       operarius.Name,
-					Image:               "N/A",
-					ExecutionCount:      operarius.Status.ExecutionCount,
-					LastExecutionTime:   lastExecutionTime,
-					LastExecutedJobName: operarius.Status.LastExecutedJobName,
-					LastExecutionStatus: "Skipped: Deduplication",
-				}
+				jobInfo = s.buildDedupSkippedJobInfo(ctx, operarius)
 			} else {
 				// Create the job
 				job, err := s.OperariusService.CreateJobFromOperarius(ctx, operarius, hookMessage)
 				if err != nil {
-					log.Error("Failed to create job from Operarius",
-						"error", err,
-						"operarius", operarius.Name)
-					metadata.JobsFailedTotal.Inc()
+					if errors.Is(err, services.ErrJobDeduplicated) {
+						// A concurrent request won the race for this deduplication
+						// window; treat it the same as the advisory check above.
+						log.Info("Job creation deduplicated at creation time (concurrent request)",
+							"operarius", operarius.Name,
+							"groupKey", hookMessage.GroupKey)
+						jobInfo = s.buildDedupSkippedJobInfo(ctx, operarius)
+					} else {
+						log.Error("Failed to create job from Operarius",
+							"error", err,
+							"operarius", operarius.Name)
+						metadata.JobsFailedTotal.Inc()
+					}
 				} else {
 
 					log.Info("Successfully created remediation job",
@@ -190,6 +180,33 @@ func (s *Server) handleOperariusBasedJobs(ctx context.Context, hookMessage model
 			// Save without job info
 			services.SaveAlert(s.AlertStore, alert, hookMessage.Status)
 		}
+	}
+}
+
+// buildDedupSkippedJobInfo marks the Operarius' dedup status and returns the
+// JobInfo describing a job creation that was skipped due to deduplication.
+func (s *Server) buildDedupSkippedJobInfo(ctx context.Context, operarius *operariusv1alpha1.Operarius) *alertstore.JobInfo {
+	if err := s.OperariusService.UpdateOperariusDedupStatus(ctx, operarius); err != nil {
+		log.Warn("Failed to update Operarius dedup status",
+			"error", err,
+			"operarius", operarius.Name)
+	}
+
+	var lastExecutionTime *time.Time
+	if operarius.Status.LastExecutionTime != nil {
+		t := operarius.Status.LastExecutionTime.Time
+		lastExecutionTime = &t
+	}
+
+	return &alertstore.JobInfo{
+		JobName:             "N/A (Deduplicated)",
+		Namespace:           operarius.Namespace,
+		OperariusName:       operarius.Name,
+		Image:               "N/A",
+		ExecutionCount:      operarius.Status.ExecutionCount,
+		LastExecutionTime:   lastExecutionTime,
+		LastExecutedJobName: operarius.Status.LastExecutedJobName,
+		LastExecutionStatus: "Skipped: Deduplication",
 	}
 }
 

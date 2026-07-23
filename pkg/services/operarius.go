@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
@@ -21,6 +23,14 @@ import (
 	"github.com/OpenFero/openfero/pkg/models"
 	"github.com/OpenFero/openfero/pkg/utils"
 )
+
+// ErrJobDeduplicated is returned by CreateJobFromOperarius when a Job for the
+// same Operarius and alert group already exists within the current
+// deduplication window. CheckDeduplication's list-based check is advisory and
+// racy under concurrent requests; this error signals the atomic backstop
+// (a deterministic Job name plus the API server's uniqueness guarantee) that
+// actually prevents duplicate Jobs from being created.
+var ErrJobDeduplicated = errors.New("job already exists for this deduplication window")
 
 // OperariusClientInterface defines the interface for Operarius client operations
 // This allows for mocking in tests
@@ -173,12 +183,22 @@ func (s *OperariusService) CreateJobFromOperarius(ctx context.Context, operarius
 	// Create the job with proper metadata
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: fmt.Sprintf("%s-", operarius.Name),
-			Namespace:    operarius.Namespace,
-			Labels:       make(map[string]string),
-			Annotations:  make(map[string]string),
+			Namespace:   operarius.Namespace,
+			Labels:      make(map[string]string),
+			Annotations: make(map[string]string),
 		},
 		Spec: jobTemplate.Spec,
+	}
+
+	// When time-based deduplication is enabled, use a deterministic name
+	// instead of GenerateName. Two requests racing past CheckDeduplication's
+	// list-based check will compute the same name; the API server allows only
+	// one of the resulting Create calls to succeed, so the race is closed
+	// atomically instead of relying on the advisory pre-check alone.
+	if dedup := operarius.Spec.Deduplication; dedup != nil && dedup.Enabled && dedup.TTL > 0 {
+		job.Name = dedupJobName(operarius.Name, hookMessage.GroupKey, dedup.TTL)
+	} else {
+		job.GenerateName = fmt.Sprintf("%s-", operarius.Name)
 	}
 
 	// Copy labels and annotations from template ObjectMeta
@@ -218,10 +238,29 @@ func (s *OperariusService) CreateJobFromOperarius(ctx context.Context, operarius
 	// Create the job in Kubernetes
 	createdJob, err := s.kubeClient.BatchV1().Jobs(job.Namespace).Create(ctx, job, metav1.CreateOptions{})
 	if err != nil {
+		if job.Name != "" && k8serrors.IsAlreadyExists(err) {
+			return nil, ErrJobDeduplicated
+		}
 		return nil, fmt.Errorf("failed to create job: %w", err)
 	}
 
 	return createdJob, nil
+}
+
+// dedupJobName derives a deterministic Job name for a given Operarius and
+// alert group within the current deduplication window ("bucket" = TTL-sized,
+// epoch-aligned interval). Aligning the window to fixed epoch boundaries
+// (rather than a sliding window anchored to the last Job's creation time)
+// trades a small amount of precision at window boundaries for atomicity: the
+// name can be computed independently by concurrent callers and Kubernetes'
+// name-uniqueness check becomes the actual deduplication guard.
+func dedupJobName(operariusName, groupKey string, ttlSeconds int32) string {
+	window := time.Now().Unix() / int64(ttlSeconds)
+	name := strings.ToLower(fmt.Sprintf("%s-%s-%d", operariusName, utils.HashGroupKey(groupKey), window))
+	if len(name) > 63 {
+		name = name[:63]
+	}
+	return strings.TrimRight(name, "-")
 }
 
 // applyTemplateVariables applies Go template variables to the job
@@ -360,15 +399,19 @@ func (s *OperariusService) GetOperariiForNamespace(ctx context.Context, namespac
 		return []operariusv1alpha1.Operarius{}, nil
 	}
 
-	// Always read from API to get the latest Operarii
-	// This ensures newly created Operarii are immediately available
-	// The cache is still used for informer event handlers
-	operarii, err := s.operariusClient.ListFromAPI(ctx)
+	// Prefer the informer cache: it is kept current via a Kubernetes watch
+	// (updates typically land well under a second) and reading from it avoids
+	// hitting the API server on every single incoming alert. Falling back to
+	// a live API call on every request would defeat the purpose of running
+	// the informer and add unnecessary API server load and latency, most
+	// painfully during exactly the alert bursts this service exists to react to.
+	operarii, err := s.operariusClient.List()
 	if err != nil {
-		// Fallback to cache if API call fails (e.g., network issues)
-		log.Warn("Failed to list Operarii from API, trying cache",
+		// Fall back to a direct API read if the cache isn't available yet,
+		// e.g. the informer hasn't finished its initial sync.
+		log.Warn("Failed to list Operarii from cache, falling back to API",
 			"error", err)
-		operarii, err = s.operariusClient.List()
+		operarii, err = s.operariusClient.ListFromAPI(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list Operarii: %w", err)
 		}
