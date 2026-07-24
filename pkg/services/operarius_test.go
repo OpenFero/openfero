@@ -226,7 +226,7 @@ func TestOperariusService_CreateJobFromOperarius(t *testing.T) {
 					},
 				},
 				Spec: batchv1.JobSpec{
-					BackoffLimit: int32Ptr(3),
+					BackoffLimit: new(int32(3)),
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
 							RestartPolicy: corev1.RestartPolicyNever,
@@ -1060,11 +1060,6 @@ func TestOperariusService_DeduplicationDisabled(t *testing.T) {
 }
 
 // Helper functions
-//
-//go:fix inline
-func int32Ptr(i int32) *int32 {
-	return new(i)
-}
 
 func getEnvValue(envVars []corev1.EnvVar, name string) string {
 	for _, env := range envVars {
@@ -2233,10 +2228,8 @@ func TestCreateJobFromOperarius_ConcurrentRequestsCreateExactlyOneJob(t *testing
 	dedupErrors := make(chan error, concurrency)
 	otherErrors := make(chan error, concurrency)
 
-	for i := 0; i < concurrency; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range concurrency {
+		wg.Go(func() {
 			job, err := service.CreateJobFromOperarius(context.TODO(), operarius, hookMessage)
 			switch {
 			case err == nil:
@@ -2246,7 +2239,7 @@ func TestCreateJobFromOperarius_ConcurrentRequestsCreateExactlyOneJob(t *testing
 			default:
 				otherErrors <- err
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	close(successes)
@@ -2280,7 +2273,7 @@ func TestCreateJobFromOperarius_DifferentGroupKeysNotDeduplicated(t *testing.T) 
 	operarius := dedupOperariusFixture(&operariusv1alpha1.DeduplicationConfig{Enabled: true, TTL: 1_000_000_000})
 	ctx := context.TODO()
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		hookMessage := models.HookMessage{
 			Status:   "firing",
 			GroupKey: fmt.Sprintf("group-%d", i),
