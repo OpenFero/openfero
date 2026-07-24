@@ -24,11 +24,13 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	openferoutils "github.com/OpenFero/openfero/pkg/utils"
 	"github.com/OpenFero/openfero/test/utils"
 )
 
@@ -404,6 +406,37 @@ spec:
   priority: 100
 `
 
+		const dedupOperariusYAML = `
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
+metadata:
+  name: e2e-dedup-remediation
+  namespace: openfero
+spec:
+  alertSelector:
+    alertname: E2EDedupAlert
+    status: firing
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      ttlSecondsAfterFinished: 300
+      template:
+        spec:
+          containers:
+          - name: remediation
+            image: busybox:latest
+            command:
+            - /bin/sh
+            - -c
+            - echo "E2E dedup remediation executed" && sleep 2
+          restartPolicy: Never
+  enabled: true
+  priority: 100
+  deduplication:
+    enabled: true
+    ttl: 60
+`
+
 		BeforeAll(func() {
 			By("creating test Operarius")
 			err := utils.ApplyYAML(withNamespace(e2eOperariusYAML))
@@ -414,10 +447,21 @@ spec:
 				_, err := utils.Run(cmd)
 				return err
 			}, 30*time.Second, time.Second).Should(Succeed())
+
+			By("creating deduplication-enabled test Operarius")
+			err = utils.ApplyYAML(withNamespace(dedupOperariusYAML))
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(func() error {
+				cmd := exec.Command("kubectl", "get", "operarius", "e2e-dedup-remediation", "-n", namespace)
+				_, err := utils.Run(cmd)
+				return err
+			}, 30*time.Second, time.Second).Should(Succeed())
 		})
 
 		AfterAll(func() {
 			_ = utils.DeleteYAML(withNamespace(e2eOperariusYAML))
+			_ = utils.DeleteYAML(withNamespace(dedupOperariusYAML))
 		})
 
 		It("should accept valid alert webhook and create a job", func() {
@@ -555,27 +599,53 @@ spec:
 			Expect(output).To(ContainSubstring("200"))
 		})
 
-		It("should not create duplicate jobs for same groupKey", func() {
-			alertJSON := `{
+		// dedupAlertJSON builds a webhook payload targeting the dedup-enabled
+		// Operarius for the given groupKey.
+		dedupAlertJSON := func(groupKey string) string {
+			return fmt.Sprintf(`{
 				"version": "4",
-				"groupKey": "e2e-dedup-test-group",
+				"groupKey": "%s",
 				"status": "firing",
 				"receiver": "openfero",
 				"groupLabels": {
-					"alertname": "E2ETestAlert"
+					"alertname": "E2EDedupAlert"
 				},
 				"commonLabels": {
-					"alertname": "E2ETestAlert"
+					"alertname": "E2EDedupAlert"
 				},
 				"alerts": [{
 					"status": "firing",
 					"labels": {
-						"alertname": "E2ETestAlert"
+						"alertname": "E2EDedupAlert"
 					}
 				}]
-			}`
+			}`, groupKey)
+		}
 
-			By("sending first alert")
+		// dedupJobLabelSelector scopes job lookups to the dedup Operarius and
+		// a specific alert group, using the same hash the application uses
+		// for the "openfero.io/group-key" label.
+		dedupJobLabelSelector := func(groupKey string) string {
+			return fmt.Sprintf("openfero.io/operarius=e2e-dedup-remediation,openfero.io/group-key=%s",
+				openferoutils.HashGroupKey(groupKey))
+		}
+
+		countDedupJobs := func(groupKey string) (int, error) {
+			cmd := exec.Command("kubectl", "get", "jobs", "-n", namespace,
+				"-l", dedupJobLabelSelector(groupKey),
+				"-o", "jsonpath={.items[*].metadata.name}")
+			output, err := utils.Run(cmd)
+			if err != nil {
+				return 0, err
+			}
+			return len(strings.Fields(output)), nil
+		}
+
+		It("should not create duplicate jobs for sequential alerts with the same groupKey", func() {
+			groupKey := fmt.Sprintf("e2e-dedup-sequential-%d", time.Now().UnixNano())
+			alertJSON := dedupAlertJSON(groupKey)
+
+			By("sending the first alert")
 			cmd := exec.Command("curl", "-s", "-X", "POST",
 				fmt.Sprintf("http://localhost:%s/alerts", localPort),
 				"-H", "Content-Type: application/json",
@@ -584,40 +654,64 @@ spec:
 			_, err := utils.Run(cmd)
 			Expect(err).NotTo(HaveOccurred())
 
-			// Wait for job to be created
-			time.Sleep(3 * time.Second)
+			By("waiting for exactly one job to be created")
+			Eventually(func() (int, error) {
+				return countDedupJobs(groupKey)
+			}, 30*time.Second, time.Second).Should(Equal(1))
 
-			By("counting initial jobs")
-			cmd = exec.Command("kubectl", "get", "jobs", "-n", namespace,
-				"-l", "openfero.io/group-key",
-				"-o", "jsonpath={.items[*].metadata.name}")
-			initialOutput, err := utils.Run(cmd)
+			By("sending three more duplicate alerts with the same groupKey")
+			for i := 0; i < 3; i++ {
+				cmd := exec.Command("curl", "-s", "-X", "POST",
+					fmt.Sprintf("http://localhost:%s/alerts", localPort),
+					"-H", "Content-Type: application/json",
+					"-d", alertJSON,
+				)
+				_, err := utils.Run(cmd)
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			// Give OpenFero time to process the duplicates before asserting.
+			time.Sleep(5 * time.Second)
+
+			By("verifying no additional jobs were created")
+			count, err := countDedupJobs(groupKey)
 			Expect(err).NotTo(HaveOccurred())
-			initialJobCount := len(strings.Fields(initialOutput))
+			Expect(count).To(Equal(1), "duplicate alerts within the TTL window must not create additional jobs")
+		})
 
-			By("sending duplicate alert with same groupKey")
-			cmd = exec.Command("curl", "-s", "-X", "POST",
-				fmt.Sprintf("http://localhost:%s/alerts", localPort),
-				"-H", "Content-Type: application/json",
-				"-d", alertJSON,
-			)
-			_, err = utils.Run(cmd)
+		It("should create exactly one job when duplicate alerts arrive concurrently", func() {
+			// Regression test for a race between the advisory deduplication
+			// check and job creation: firing many identical alerts at once
+			// must still result in exactly one Job.
+			groupKey := fmt.Sprintf("e2e-dedup-concurrent-%d", time.Now().UnixNano())
+			alertJSON := dedupAlertJSON(groupKey)
+			url := fmt.Sprintf("http://localhost:%s/alerts", localPort)
+
+			By("sending 10 concurrent duplicate alerts")
+			const concurrency = 10
+			var wg sync.WaitGroup
+			for i := 0; i < concurrency; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					cmd := exec.Command("curl", "-s", "-o", "/dev/null", "-X", "POST",
+						url, "-H", "Content-Type: application/json", "-d", alertJSON)
+					_ = cmd.Run()
+				}()
+			}
+			wg.Wait()
+
+			By("verifying exactly one job was created")
+			Eventually(func() (int, error) {
+				return countDedupJobs(groupKey)
+			}, 30*time.Second, time.Second).Should(Equal(1))
+
+			// Ensure the count doesn't creep up once things settle (e.g. a
+			// delayed second job slipping past the dedup guard).
+			time.Sleep(5 * time.Second)
+			count, err := countDedupJobs(groupKey)
 			Expect(err).NotTo(HaveOccurred())
-
-			// Wait and check no new jobs created
-			time.Sleep(3 * time.Second)
-
-			By("verifying no duplicate jobs were created")
-			cmd = exec.Command("kubectl", "get", "jobs", "-n", namespace,
-				"-l", "openfero.io/group-key",
-				"-o", "jsonpath={.items[*].metadata.name}")
-			finalOutput, err := utils.Run(cmd)
-			Expect(err).NotTo(HaveOccurred())
-			finalJobCount := len(strings.Fields(finalOutput))
-
-			// The job count should not increase significantly (deduplication)
-			Expect(finalJobCount).To(BeNumerically("<=", initialJobCount+1),
-				"Duplicate alerts should be deduplicated")
+			Expect(count).To(Equal(1), "concurrent duplicate alerts must still create exactly one job")
 		})
 	})
 

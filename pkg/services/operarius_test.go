@@ -3,7 +3,9 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -35,9 +37,15 @@ type MockOperariusClient struct {
 	listErr        error
 	updateStatusFn func(ctx context.Context, operarius *operariusv1alpha1.Operarius) error
 	namespace      string
+
+	// Call counters so tests can assert which source (cache vs. live API)
+	// was actually used, not just what value was ultimately returned.
+	listCalls        int
+	listFromAPICalls int
 }
 
 func (m *MockOperariusClient) List() ([]operariusv1alpha1.Operarius, error) {
+	m.listCalls++
 	if m.listErr != nil {
 		return nil, m.listErr
 	}
@@ -45,6 +53,7 @@ func (m *MockOperariusClient) List() ([]operariusv1alpha1.Operarius, error) {
 }
 
 func (m *MockOperariusClient) ListFromAPI(ctx context.Context) ([]operariusv1alpha1.Operarius, error) {
+	m.listFromAPICalls++
 	if m.listFromAPIErr != nil {
 		return nil, m.listFromAPIErr
 	}
@@ -217,7 +226,7 @@ func TestOperariusService_CreateJobFromOperarius(t *testing.T) {
 					},
 				},
 				Spec: batchv1.JobSpec{
-					BackoffLimit: int32Ptr(3),
+					BackoffLimit: new(int32(3)),
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
 							RestartPolicy: corev1.RestartPolicyNever,
@@ -1051,11 +1060,6 @@ func TestOperariusService_DeduplicationDisabled(t *testing.T) {
 }
 
 // Helper functions
-//
-//go:fix inline
-func int32Ptr(i int32) *int32 {
-	return new(i)
-}
 
 func getEnvValue(envVars []corev1.EnvVar, name string) string {
 	for _, env := range envVars {
@@ -1114,12 +1118,14 @@ func TestGetOperariiForNamespace(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		mockClient     *MockOperariusClient
-		hasClient      bool
-		expectedCount  int
-		expectError    bool
-		errorSubstring string
+		name            string
+		mockClient      *MockOperariusClient
+		hasClient       bool
+		expectedCount   int
+		expectError     bool
+		errorSubstring  string
+		wantListCalls   int
+		wantListFromAPI int
 	}{
 		{
 			name:          "no client configured returns empty list",
@@ -1129,34 +1135,58 @@ func TestGetOperariiForNamespace(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name: "successful API call returns operarii",
+			// The informer cache is the primary source: it must be used
+			// without ever falling through to a live API call.
+			name: "cache hit returns operarii without calling the API",
 			mockClient: &MockOperariusClient{
 				operarii: testOperarii,
 			},
-			hasClient:     true,
-			expectedCount: 2,
-			expectError:   false,
+			hasClient:       true,
+			expectedCount:   2,
+			expectError:     false,
+			wantListCalls:   1,
+			wantListFromAPI: 0,
 		},
 		{
-			name: "API error falls back to cache",
+			// Even if the live API would fail, the cache must still be used
+			// and the API must never be consulted in the happy path.
+			name: "cache is used even if the API would fail",
 			mockClient: &MockOperariusClient{
 				operarii:       testOperarii,
 				listFromAPIErr: errors.New("API unavailable"),
 			},
-			hasClient:     true,
-			expectedCount: 2,
-			expectError:   false,
+			hasClient:       true,
+			expectedCount:   2,
+			expectError:     false,
+			wantListCalls:   1,
+			wantListFromAPI: 0,
 		},
 		{
-			name: "both API and cache fail returns error",
+			// If the cache isn't available yet (e.g. informer still syncing),
+			// fall back to a direct API read.
+			name: "cache error falls back to the API",
+			mockClient: &MockOperariusClient{
+				operarii: testOperarii,
+				listErr:  errors.New("cache not initialized"),
+			},
+			hasClient:       true,
+			expectedCount:   2,
+			expectError:     false,
+			wantListCalls:   1,
+			wantListFromAPI: 1,
+		},
+		{
+			name: "both cache and API fail returns error",
 			mockClient: &MockOperariusClient{
 				listFromAPIErr: errors.New("API unavailable"),
 				listErr:        errors.New("cache unavailable"),
 			},
-			hasClient:      true,
-			expectedCount:  0,
-			expectError:    true,
-			errorSubstring: "failed to list Operarii",
+			hasClient:       true,
+			expectedCount:   0,
+			expectError:     true,
+			errorSubstring:  "failed to list Operarii",
+			wantListCalls:   1,
+			wantListFromAPI: 1,
 		},
 	}
 
@@ -1182,6 +1212,11 @@ func TestGetOperariiForNamespace(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.Len(t, operarii, tt.expectedCount)
+			}
+
+			if tt.hasClient {
+				assert.Equal(t, tt.wantListCalls, tt.mockClient.listCalls, "unexpected number of cache List() calls")
+				assert.Equal(t, tt.wantListFromAPI, tt.mockClient.listFromAPICalls, "unexpected number of ListFromAPI() calls")
 			}
 		})
 	}
@@ -2025,6 +2060,235 @@ func TestCheckDeduplication_ListJobsError(t *testing.T) {
 	shouldCreate, err := service.CheckDeduplication(ctx, operarius, hookMessage)
 	assert.NoError(t, err)
 	assert.True(t, shouldCreate, "Should create job when no matching jobs exist")
+}
+
+// dedupOperariusFixture returns an Operarius with the given deduplication
+// settings, wired to a job template that always succeeds.
+func dedupOperariusFixture(dedup *operariusv1alpha1.DeduplicationConfig) *operariusv1alpha1.Operarius {
+	enabled := true
+	return &operariusv1alpha1.Operarius{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "dedup-operarius",
+			Namespace: "openfero",
+		},
+		Spec: operariusv1alpha1.OperariusSpec{
+			AlertSelector: operariusv1alpha1.AlertSelector{
+				AlertName: "TestAlert",
+				Status:    "firing",
+			},
+			JobTemplate: batchv1.JobTemplateSpec{
+				Spec: batchv1.JobSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							RestartPolicy: corev1.RestartPolicyNever,
+							Containers: []corev1.Container{
+								{
+									Name:    "remediation",
+									Image:   "busybox",
+									Command: []string{"echo", "ok"},
+								},
+							},
+						},
+					},
+				},
+			},
+			Enabled:       &enabled,
+			Deduplication: dedup,
+		},
+	}
+}
+
+// TestDedupJobName verifies the deterministic name derivation used to make
+// job creation race-safe under concurrent deduplication checks.
+func TestDedupJobName(t *testing.T) {
+	t.Run("stable within the same TTL window", func(t *testing.T) {
+		a := dedupJobName("my-operarius", "group-a", 1_000_000_000)
+		b := dedupJobName("my-operarius", "group-a", 1_000_000_000)
+		assert.Equal(t, a, b, "same operarius/groupKey/window must produce the same name")
+	})
+
+	t.Run("differs by group key", func(t *testing.T) {
+		a := dedupJobName("my-operarius", "group-a", 1_000_000_000)
+		b := dedupJobName("my-operarius", "group-b", 1_000_000_000)
+		assert.NotEqual(t, a, b)
+	})
+
+	t.Run("differs by operarius name", func(t *testing.T) {
+		a := dedupJobName("operarius-a", "group", 1_000_000_000)
+		b := dedupJobName("operarius-b", "group", 1_000_000_000)
+		assert.NotEqual(t, a, b)
+	})
+
+	t.Run("respects Kubernetes name length limit", func(t *testing.T) {
+		longName := strings.Repeat("a", 100)
+		name := dedupJobName(longName, "some-group-key", 300)
+		assert.LessOrEqual(t, len(name), 63)
+		assert.False(t, strings.HasSuffix(name, "-"), "truncated name must not end with a hyphen")
+	})
+}
+
+// TestCreateJobFromOperarius_DeduplicationNaming verifies that a deterministic
+// Job name is only used when time-based deduplication is actually active;
+// otherwise the existing GenerateName behavior is preserved.
+func TestCreateJobFromOperarius_DeduplicationNaming(t *testing.T) {
+	hookMessage := models.HookMessage{
+		Status:   "firing",
+		GroupKey: "test-group",
+		Alerts: []models.Alert{
+			{Labels: map[string]string{"alertname": "TestAlert"}},
+		},
+	}
+
+	tests := []struct {
+		name              string
+		deduplication     *operariusv1alpha1.DeduplicationConfig
+		wantDeterministic bool
+	}{
+		{name: "no deduplication config", deduplication: nil, wantDeterministic: false},
+		{name: "deduplication disabled", deduplication: &operariusv1alpha1.DeduplicationConfig{Enabled: false, TTL: 300}, wantDeterministic: false},
+		{name: "deduplication enabled, zero TTL", deduplication: &operariusv1alpha1.DeduplicationConfig{Enabled: true, TTL: 0}, wantDeterministic: false},
+		{name: "deduplication enabled with TTL", deduplication: &operariusv1alpha1.DeduplicationConfig{Enabled: true, TTL: 1_000_000_000}, wantDeterministic: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			kubeClient := fake.NewSimpleClientset()
+			service := NewOperariusService(kubeClient)
+			operarius := dedupOperariusFixture(tt.deduplication)
+
+			job, err := service.CreateJobFromOperarius(context.TODO(), operarius, hookMessage)
+			require.NoError(t, err)
+			require.NotNil(t, job)
+
+			if tt.wantDeterministic {
+				assert.Empty(t, job.GenerateName)
+				assert.Equal(t, dedupJobName(operarius.Name, hookMessage.GroupKey, tt.deduplication.TTL), job.Name)
+			} else {
+				assert.Empty(t, job.Name, "job.Name should be assigned by the API server via GenerateName")
+				assert.Equal(t, "dedup-operarius-", job.GenerateName)
+			}
+		})
+	}
+}
+
+// TestCreateJobFromOperarius_ReturnsErrJobDeduplicated verifies that creating
+// a job which collides with an already-existing job in the same
+// deduplication window surfaces ErrJobDeduplicated instead of a generic
+// creation error.
+func TestCreateJobFromOperarius_ReturnsErrJobDeduplicated(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	service := NewOperariusService(kubeClient)
+
+	operarius := dedupOperariusFixture(&operariusv1alpha1.DeduplicationConfig{Enabled: true, TTL: 1_000_000_000})
+	hookMessage := models.HookMessage{
+		Status:   "firing",
+		GroupKey: "test-group",
+		Alerts: []models.Alert{
+			{Labels: map[string]string{"alertname": "TestAlert"}},
+		},
+	}
+
+	ctx := context.TODO()
+
+	// First creation should succeed and occupy the deterministic name.
+	job, err := service.CreateJobFromOperarius(ctx, operarius, hookMessage)
+	require.NoError(t, err)
+	require.NotNil(t, job)
+
+	// A second creation for the same Operarius/group-key within the same
+	// window must be reported as deduplicated, not as a hard failure.
+	job2, err := service.CreateJobFromOperarius(ctx, operarius, hookMessage)
+	assert.Nil(t, job2)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, ErrJobDeduplicated), "expected ErrJobDeduplicated, got: %v", err)
+}
+
+// TestCreateJobFromOperarius_ConcurrentRequestsCreateExactlyOneJob is a
+// regression test for the TOCTOU race between CheckDeduplication's
+// list-based check and CreateJobFromOperarius: multiple goroutines racing
+// to create a job for the same Operarius/group-key must result in exactly
+// one Job existing in the cluster, with every other caller observing
+// ErrJobDeduplicated.
+func TestCreateJobFromOperarius_ConcurrentRequestsCreateExactlyOneJob(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	service := NewOperariusService(kubeClient)
+
+	operarius := dedupOperariusFixture(&operariusv1alpha1.DeduplicationConfig{Enabled: true, TTL: 1_000_000_000})
+	hookMessage := models.HookMessage{
+		Status:   "firing",
+		GroupKey: "race-group",
+		Alerts: []models.Alert{
+			{Labels: map[string]string{"alertname": "TestAlert"}},
+		},
+	}
+
+	const concurrency = 20
+	var wg sync.WaitGroup
+	successes := make(chan *batchv1.Job, concurrency)
+	dedupErrors := make(chan error, concurrency)
+	otherErrors := make(chan error, concurrency)
+
+	for range concurrency {
+		wg.Go(func() {
+			job, err := service.CreateJobFromOperarius(context.TODO(), operarius, hookMessage)
+			switch {
+			case err == nil:
+				successes <- job
+			case errors.Is(err, ErrJobDeduplicated):
+				dedupErrors <- err
+			default:
+				otherErrors <- err
+			}
+		})
+	}
+	wg.Wait()
+	close(successes)
+	close(dedupErrors)
+	close(otherErrors)
+
+	var otherErrs []error
+	for err := range otherErrors {
+		otherErrs = append(otherErrs, err)
+	}
+	assert.Empty(t, otherErrs, "no unexpected errors should occur")
+
+	successCount := len(successes)
+	dedupCount := len(dedupErrors)
+	assert.Equal(t, 1, successCount, "exactly one concurrent request should create the job")
+	assert.Equal(t, concurrency-1, dedupCount, "all other requests should be deduplicated")
+
+	// Confirm cluster state matches: exactly one Job actually exists.
+	jobs, err := kubeClient.BatchV1().Jobs(operarius.Namespace).List(context.TODO(), metav1.ListOptions{})
+	require.NoError(t, err)
+	assert.Len(t, jobs.Items, 1)
+}
+
+// TestCreateJobFromOperarius_DifferentGroupKeysNotDeduplicated ensures the
+// deterministic naming scheme does not accidentally collide across distinct
+// alert groups.
+func TestCreateJobFromOperarius_DifferentGroupKeysNotDeduplicated(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	service := NewOperariusService(kubeClient)
+
+	operarius := dedupOperariusFixture(&operariusv1alpha1.DeduplicationConfig{Enabled: true, TTL: 1_000_000_000})
+	ctx := context.TODO()
+
+	for i := range 3 {
+		hookMessage := models.HookMessage{
+			Status:   "firing",
+			GroupKey: fmt.Sprintf("group-%d", i),
+			Alerts: []models.Alert{
+				{Labels: map[string]string{"alertname": "TestAlert"}},
+			},
+		}
+		job, err := service.CreateJobFromOperarius(ctx, operarius, hookMessage)
+		require.NoError(t, err)
+		require.NotNil(t, job)
+	}
+
+	jobs, err := kubeClient.BatchV1().Jobs(operarius.Namespace).List(ctx, metav1.ListOptions{})
+	require.NoError(t, err)
+	assert.Len(t, jobs.Items, 3, "distinct group keys must not be deduplicated against each other")
 }
 
 // TestCheckDeduplication_JobOutsideTTL tests that old jobs don't block new job creation
