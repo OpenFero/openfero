@@ -670,7 +670,7 @@ spec:
 				Expect(err).NotTo(HaveOccurred())
 			}
 
-			// Give OpenFero time to (mis)process the duplicates before asserting.
+			// Give OpenFero time to process the duplicates before asserting.
 			time.Sleep(5 * time.Second)
 
 			By("verifying no additional jobs were created")
