@@ -79,6 +79,11 @@ jobs:
         uses: super-linter/super-linter/slim@4ce20838b8ab83717e78138c5b3a1407148e0918 # v8.7.0
         env:
           VALIDATE_ALL_CODEBASE: false
+          # Trivy ignores VALIDATE_ALL_CODEBASE and always scans the whole
+          # workspace, so it would flag pre-existing findings unrelated to
+          # the PR's diff. Restrict it to push (main) runs; PR-time dependency
+          # vulnerability feedback is handled by dependency-review.yml instead.
+          VALIDATE_TRIVY: ${{ github.event_name == 'push' }}
           VALIDATE_CHECKOV: false
           VALIDATE_YAML: false
           # Go linting via golangci-lint using .github/linters/.golangci.yml

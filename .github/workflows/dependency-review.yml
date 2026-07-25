@@ -10,6 +10,8 @@ on:
     paths:
       - "go.mod"
       - "go.sum"
+      - "frontend/package.json"
+      - "frontend/package-lock.json"
 
 permissions:
   contents: read
