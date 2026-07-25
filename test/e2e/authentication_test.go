@@ -39,7 +39,7 @@ var _ = Describe("Authentication", Ordered, func() {
 
 		// Create a curl pod for triggering alerts
 		cmd = exec.Command("kubectl", "run", "curl", "--image=curlimages/curl", "--restart=Never", "-n", namespace, "--", "sleep", "3600")
-		utils.Run(cmd) // Ignore error if already exists
+		_, _ = utils.Run(cmd) // Ignore error if already exists
 
 		// Wait for curl pod
 		Eventually(func() error {
@@ -75,7 +75,7 @@ var _ = Describe("Authentication", Ordered, func() {
 
 			// Test direct webhook to verify OpenFero is listening and logging
 			By("Sending direct webhook to OpenFero")
-			payload := fmt.Sprintf(`{
+			payload := `{
 				"version": "4",
 				"groupKey": "test",
 				"status": "firing",
@@ -83,7 +83,7 @@ var _ = Describe("Authentication", Ordered, func() {
 				"groupLabels": {"alertname": "DirectTestAlert"},
 				"commonLabels": {"alertname": "DirectTestAlert"},
 				"alerts": [{"status": "firing", "labels": {"alertname": "DirectTestAlert"}}]
-			}`)
+			}`
 			cmd = exec.Command("kubectl", "exec", "curl", "-n", namespace, "--", "curl", "-XPOST", "-H", "Content-Type: application/json", "-d", payload, "http://openfero:8080/alerts")
 			output, err = utils.Run(cmd)
 			Expect(err).NotTo(HaveOccurred(), "Failed to send direct webhook: %s", output)
@@ -93,7 +93,7 @@ var _ = Describe("Authentication", Ordered, func() {
 
 			// Debug: Check Alertmanager alerts
 			cmd = exec.Command("kubectl", "exec", "curl", "-n", namespace, "--", "curl", "-s", "http://alertmanager:9093/api/v2/alerts")
-			output, err = utils.Run(cmd)
+			output, _ = utils.Run(cmd)
 			fmt.Printf("Alertmanager alerts: %s\n", output)
 
 			verifyAlertReceived("TestAlertNoAuth")
@@ -142,20 +142,22 @@ func upgradeOpenFero(method, user, pass, token string) {
 		"--wait",
 	}
 
-	if method == "none" {
+	switch method {
+	case "none":
 		args = append(args, "--set", "auth.enabled=false")
-	} else {
+	case "basic":
+		args = append(args,
+			"--set", "auth.enabled=true",
+			"--set", fmt.Sprintf("auth.basic.username=%s", user),
+			"--set", fmt.Sprintf("auth.basic.password=%s", pass),
+		)
+	case "bearer":
+		args = append(args,
+			"--set", "auth.enabled=true",
+			"--set", fmt.Sprintf("auth.bearer.token=%s", token),
+		)
+	default:
 		args = append(args, "--set", "auth.enabled=true")
-		if method == "basic" {
-			args = append(args,
-				"--set", fmt.Sprintf("auth.basic.username=%s", user),
-				"--set", fmt.Sprintf("auth.basic.password=%s", pass),
-			)
-		} else if method == "bearer" {
-			args = append(args,
-				"--set", fmt.Sprintf("auth.bearer.token=%s", token),
-			)
-		}
 	}
 
 	cmd := exec.Command("helm", args...)

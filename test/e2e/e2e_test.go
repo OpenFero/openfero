@@ -444,8 +444,8 @@ spec:
 
 			Eventually(func() error {
 				cmd := exec.Command("kubectl", "get", "operarius", "e2e-test-remediation", "-n", namespace)
-				_, err := utils.Run(cmd)
-				return err
+				_, runErr := utils.Run(cmd)
+				return runErr
 			}, 30*time.Second, time.Second).Should(Succeed())
 
 			By("creating deduplication-enabled test Operarius")
@@ -666,8 +666,8 @@ spec:
 					"-H", "Content-Type: application/json",
 					"-d", alertJSON,
 				)
-				_, err := utils.Run(cmd)
-				Expect(err).NotTo(HaveOccurred())
+				_, runErr := utils.Run(cmd)
+				Expect(runErr).NotTo(HaveOccurred())
 			}
 
 			// Give OpenFero time to process the duplicates before asserting.
@@ -940,8 +940,8 @@ spec:
 			Eventually(func() bool {
 				cmd := exec.Command("kubectl", "get", "pod", "crashloop-victim", "-n", testNs,
 					"-o", "jsonpath={.status.phase}")
-				output, err := utils.Run(cmd)
-				if err != nil {
+				output, runErr := utils.Run(cmd)
+				if runErr != nil {
 					return false
 				}
 				return strings.TrimSpace(output) == "Running"
@@ -1169,8 +1169,8 @@ spec:
 			Eventually(func() bool {
 				cmd := exec.Command("kubectl", "get", "job", "failed-job-victim", "-n", testNs,
 					"-o", "jsonpath={.status.failed}")
-				output, err := utils.Run(cmd)
-				if err != nil {
+				output, runErr := utils.Run(cmd)
+				if runErr != nil {
 					return false
 				}
 				return strings.TrimSpace(output) == "1"
