@@ -44,6 +44,7 @@ jobs:
     permissions:
       contents: read # Required for actions/checkout to fetch code
       statuses: write # Required for github/super-linter to mark status of each linter run
+      pull-requests: write
     runs-on: ubuntu-latest
     steps:
       - name: Harden the runner (Audit all outbound calls)
