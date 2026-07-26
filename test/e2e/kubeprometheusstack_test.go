@@ -553,6 +553,12 @@ func readRepoFile(relPath string) string {
 	return string(data)
 }
 
+// withEnabled flips a shipped Operarius template's spec.enabled from its
+// disabled-by-default "enabled: false" to "enabled: true".
+func withEnabled(yaml string) string {
+	return strings.Replace(yaml, "enabled: false", "enabled: true", 1)
+}
+
 func createKPSTestNamespace(testNs string) {
 	cmd := exec.Command("kubectl", "create", "namespace", testNs, "--dry-run=client", "-o", "yaml")
 	output, err := utils.Run(cmd)
@@ -578,7 +584,10 @@ func runKPSScenario(testNs, alertName string, provoke func(testNs string), verif
 	Expect(utils.ApplyYAML(rbacYAML)).To(Succeed())
 	defer func() { _ = utils.DeleteYAML(rbacYAML) }()
 
-	operariusYAML := withNamespace(readRepoFile(filepath.Join(operariusDir, "operarius.yaml")))
+	// The shipped operarius.yaml is a template with spec.enabled: false (see
+	// operarios/kube-prometheus-stack/README.md) - flip it on here to
+	// simulate a user who has reviewed and enabled it for their environment.
+	operariusYAML := withEnabled(withNamespace(readRepoFile(filepath.Join(operariusDir, "operarius.yaml"))))
 	Expect(utils.ApplyYAML(operariusYAML)).To(Succeed())
 	defer func() { _ = utils.DeleteYAML(operariusYAML) }()
 

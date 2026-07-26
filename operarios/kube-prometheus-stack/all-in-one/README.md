@@ -2,15 +2,20 @@
 
 This directory contains a single YAML file with all Operarii and RBAC resources for easy installation.
 
+**These are templates, not ready-to-run production jobs** - see the [catalog README](../README.md#%EF%B8%8F-these-are-templates-not-install-and-forget) for why. Every Operarius in this bundle ships with `spec.enabled: false`; applying the bundle installs them inert. Review, scope (`alertSelector.labels`), and enable each one individually before it will actually remediate anything.
+
 ## Quick Start
 
 ```bash
-# Install all Operarii and RBAC
+# Install all Operarii and RBAC (they come disabled)
 kubectl apply -f operarii-bundle.yaml
 
 # Verify installation
 kubectl get operarius -n openfero
 kubectl get serviceaccounts -n openfero | grep openfero-
+
+# For each Operarius you want active: edit its alertSelector.labels to scope
+# it to your environment, then set spec.enabled: true and re-apply.
 ```
 
 ## What's Included
@@ -61,7 +66,7 @@ kubectl delete -f operarii-bundle.yaml
 To customize before applying:
 
 1. Download the bundle
-2. Edit as needed (priorities, TTLs, enabled flags)
+2. Edit as needed (scope via `alertSelector.labels`, priorities, TTLs, then flip `enabled: true` for the ones you want active)
 3. Apply the modified version
 
 ```bash

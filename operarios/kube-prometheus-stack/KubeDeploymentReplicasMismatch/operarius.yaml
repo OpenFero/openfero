@@ -7,6 +7,16 @@ spec:
   alertSelector:
     alertname: KubeDeploymentReplicasMismatch
     status: firing
+    # This template matches every KubeDeploymentReplicasMismatch alert
+    # cluster-wide by default. A rollout restart only helps with TRANSIENT
+    # problems - it recreates pods from the same template, so it cannot fix
+    # a persistent misconfiguration. Scope this to your own environment
+    # before enabling. Any label already present on the alert works here
+    # (e.g. namespace); arbitrary Kubernetes object labels are NOT
+    # automatically available unless kube-state-metrics is configured to
+    # expose them and the alerting rule joins on them.
+    # labels:
+    #   namespace: my-app-namespace
 
   jobTemplate:
     spec:
@@ -73,7 +83,8 @@ spec:
                   fi
 
   priority: 60
-  enabled: true
+  # Template: review scope/priority/dedup above, then flip to true.
+  enabled: false
 
   deduplication:
     enabled: true

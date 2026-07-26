@@ -7,6 +7,15 @@ spec:
   alertSelector:
     alertname: KubeJobNotCompleted
     status: firing
+    # This template matches every KubeJobNotCompleted alert cluster-wide by
+    # default, deleting an ACTIVE job (and its running pods). Some jobs are
+    # legitimately long-running - scope this to your own environment before
+    # enabling. Any label already present on the alert works here (e.g.
+    # namespace); arbitrary Kubernetes object labels are NOT automatically
+    # available unless kube-state-metrics is configured to expose them and
+    # the alerting rule joins on them.
+    # labels:
+    #   namespace: my-app-namespace
 
   jobTemplate:
     spec:
@@ -71,7 +80,8 @@ spec:
                   exit 0
 
   priority: 35
-  enabled: true
+  # Template: review scope/priority/dedup above, then flip to true.
+  enabled: false
 
   deduplication:
     enabled: true

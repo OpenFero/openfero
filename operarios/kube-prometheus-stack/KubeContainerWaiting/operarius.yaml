@@ -7,6 +7,15 @@ spec:
   alertSelector:
     alertname: KubeContainerWaiting
     status: firing
+    # This template matches every KubeContainerWaiting alert cluster-wide by
+    # default. Restarting a pod is safe in general, but whether it's the
+    # RIGHT reaction still depends on the workload - scope this to your own
+    # environment before enabling. Any label already present on the alert
+    # works here (e.g. namespace); arbitrary Kubernetes object labels are
+    # NOT automatically available unless kube-state-metrics is configured
+    # to expose them and the alerting rule joins on them.
+    # labels:
+    #   namespace: my-app-namespace
 
   jobTemplate:
     spec:
@@ -57,7 +66,8 @@ spec:
                   fi
 
   priority: 65
-  enabled: true
+  # Template: review scope/priority/dedup above, then flip to true.
+  enabled: false
 
   deduplication:
     enabled: true
