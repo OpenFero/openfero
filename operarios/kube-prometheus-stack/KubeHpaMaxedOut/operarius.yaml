@@ -7,6 +7,16 @@ spec:
   alertSelector:
     alertname: KubeHpaMaxedOut
     status: firing
+    # This template matches every KubeHpaMaxedOut alert cluster-wide by
+    # default. Blindly raising maxReplicas can mask a real bug (e.g. a retry
+    # loop driving load) as "needs more capacity" and cost real money - this
+    # is the least "safe by default" template in this catalog. Scope this to
+    # your own environment before enabling. Any label already present on the
+    # alert works here (e.g. namespace); arbitrary Kubernetes object labels
+    # are NOT automatically available unless kube-state-metrics is
+    # configured to expose them and the alerting rule joins on them.
+    # labels:
+    #   namespace: my-app-namespace
 
   jobTemplate:
     spec:
@@ -79,7 +89,8 @@ spec:
                   exit 0
 
   priority: 50
-  enabled: true
+  # Template: review scope/priority/dedup above, then flip to true.
+  enabled: false
 
   deduplication:
     enabled: true
