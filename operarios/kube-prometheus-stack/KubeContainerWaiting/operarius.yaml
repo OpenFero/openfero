@@ -1,0 +1,64 @@
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
+metadata:
+  name: container-waiting-restart
+  namespace: openfero
+spec:
+  alertSelector:
+    alertname: KubeContainerWaiting
+    status: firing
+
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 600
+      template:
+        spec:
+          serviceAccountName: openfero-container-waiting-restarter
+          restartPolicy: Never
+          containers:
+            - name: container-waiting-restarter
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  echo "=== KubeContainerWaiting Remediation ==="
+                  echo "Pod: ${OPENFERO_POD}"
+                  echo "Namespace: ${OPENFERO_NAMESPACE}"
+                  echo "Container: ${OPENFERO_CONTAINER}"
+                  echo "Reason: ${OPENFERO_REASON}"
+                  echo ""
+
+                  # Validate required variables
+                  if [ -z "${OPENFERO_POD}" ] || [ -z "${OPENFERO_NAMESPACE}" ]; then
+                    echo "ERROR: Missing required environment variables"
+                    exit 1
+                  fi
+
+                  # Check if pod exists
+                  if ! kubectl get pod "${OPENFERO_POD}" -n "${OPENFERO_NAMESPACE}" > /dev/null 2>&1; then
+                    echo "Pod not found - may have already been deleted"
+                    exit 0
+                  fi
+
+                  # Delete pod to force a fresh reschedule/image pull
+                  echo "Deleting pod to trigger reschedule..."
+                  kubectl delete pod "${OPENFERO_POD}" -n "${OPENFERO_NAMESPACE}" --wait=false
+
+                  if [ $? -eq 0 ]; then
+                    echo "Pod deletion triggered successfully"
+                    echo "Kubernetes controller will recreate the pod"
+                    exit 0
+                  else
+                    echo "Failed to delete pod"
+                    exit 1
+                  fi
+
+  priority: 65
+  enabled: true
+
+  deduplication:
+    enabled: true
+    ttl: 300

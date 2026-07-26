@@ -1,0 +1,37 @@
+# TEST-ONLY fixture for test/e2e/kubeprometheusstack_test.go - NOT for production use.
+#
+# Mirrors kube-prometheus-stack's real KubeJobNotCompleted alert
+# (prometheus-community/helm-charts, charts/kube-prometheus-stack, templates/
+# prometheus/rules-1.14/kubernetes-apps.yaml), whose real expr hardcodes a
+# 12h (43200s) threshold and has no `for:` field - neither is overridable via
+# the chart's `customRules` mechanism. This copy shortens the threshold to 15s
+# and adds `for: 10s` so the condition can be reproduced quickly in CI, while
+# keeping the same alert name/labels so OpenFero's alertSelector matching
+# (and the real operarios/kube-prometheus-stack/KubeJobNotCompleted/ Operarius)
+# is exercised unchanged.
+#
+# The chart's own KubeJobNotCompleted rule is disabled for this test via
+# defaultRules.disabled.KubeJobNotCompleted in kube-prometheus-stack-values.yaml
+# to avoid firing twice under two different thresholds.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: e2e-kubejobnotcompleted-test
+  namespace: openfero
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: e2e-kubejobnotcompleted-test
+      rules:
+        - alert: KubeJobNotCompleted
+          annotations:
+            description: "E2E test fixture: job {{ $labels.namespace }}/{{ $labels.job_name }} has been active for more than 15s."
+            summary: Job did not complete in time (e2e test fixture).
+          expr: |-
+            time() - max by (namespace, job_name, cluster) (kube_job_status_start_time
+              and
+            kube_job_status_active > 0) > 15
+          for: 10s
+          labels:
+            severity: warning

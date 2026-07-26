@@ -17,21 +17,27 @@ kubectl get serviceaccounts -n openfero | grep openfero-
 
 This bundle contains:
 
-### Operarii (5)
+### Operarii (8)
 - `pod-crashloop-restart` - Restarts CrashLooping pods
 - `deployment-replicas-fix` - Fixes deployment replica mismatches
 - `failed-job-cleanup` - Cleans up failed jobs
 - `hpa-scale-increase` - Increases HPA max replicas
 - `daemonset-rollout-fix` - Fixes stuck DaemonSet rollouts
+- `pod-not-ready-restart` - Restarts pods stuck not-ready
+- `container-waiting-restart` - Restarts pods stuck waiting (e.g. ImagePullBackOff)
+- `stuck-job-cleanup` - Cleans up jobs stuck running far too long
 
-### Service Accounts (5)
+### Service Accounts (8)
 - `openfero-pod-restarter`
 - `openfero-deployment-fixer`
 - `openfero-job-cleaner`
 - `openfero-hpa-scaler`
 - `openfero-daemonset-fixer`
+- `openfero-pod-not-ready-restarter`
+- `openfero-container-waiting-restarter`
+- `openfero-stuck-job-cleaner`
 
-### ClusterRoles and ClusterRoleBindings (5 each)
+### ClusterRoles and ClusterRoleBindings (8 each)
 Each Operarius has its own minimal RBAC configuration.
 
 ## Selective Installation

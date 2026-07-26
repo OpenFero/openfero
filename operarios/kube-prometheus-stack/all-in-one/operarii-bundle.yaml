@@ -41,6 +41,24 @@ metadata:
   name: openfero-daemonset-fixer
   namespace: openfero
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openfero-container-waiting-restarter
+  namespace: openfero
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openfero-pod-not-ready-restarter
+  namespace: openfero
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openfero-stuck-job-cleaner
+  namespace: openfero
+---
 # =============================================================================
 # RBAC: ClusterRoles
 # =============================================================================
@@ -110,6 +128,45 @@ rules:
     resources: ["pods"]
     verbs: ["get", "list", "delete"]
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: openfero-container-waiting-restarter
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: openfero-pod-not-ready-restarter
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: openfero-stuck-job-cleaner
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
 # =============================================================================
 # RBAC: ClusterRoleBindings
 # =============================================================================
@@ -176,6 +233,45 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: openfero-daemonset-fixer
+    namespace: openfero
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openfero-container-waiting-restarter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: openfero-container-waiting-restarter
+subjects:
+  - kind: ServiceAccount
+    name: openfero-container-waiting-restarter
+    namespace: openfero
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openfero-pod-not-ready-restarter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: openfero-pod-not-ready-restarter
+subjects:
+  - kind: ServiceAccount
+    name: openfero-pod-not-ready-restarter
+    namespace: openfero
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openfero-stuck-job-cleaner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: openfero-stuck-job-cleaner
+subjects:
+  - kind: ServiceAccount
+    name: openfero-stuck-job-cleaner
     namespace: openfero
 ---
 # =============================================================================
@@ -438,3 +534,161 @@ spec:
   deduplication:
     enabled: true
     ttl: 600
+---
+# =============================================================================
+# Operarius: KubePodNotReady
+# Priority: 75
+# =============================================================================
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
+metadata:
+  name: pod-not-ready-restart
+  namespace: openfero
+spec:
+  alertSelector:
+    alertname: KubePodNotReady
+    status: firing
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 600
+      template:
+        spec:
+          serviceAccountName: openfero-pod-not-ready-restarter
+          restartPolicy: Never
+          containers:
+            - name: pod-not-ready-restarter
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  echo "=== KubePodNotReady Remediation ==="
+                  echo "Pod: ${OPENFERO_POD}"
+                  echo "Namespace: ${OPENFERO_NAMESPACE}"
+                  echo ""
+                  if [ -z "${OPENFERO_POD}" ] || [ -z "${OPENFERO_NAMESPACE}" ]; then
+                    echo "ERROR: Missing required environment variables"
+                    exit 1
+                  fi
+                  if ! kubectl get pod "${OPENFERO_POD}" -n "${OPENFERO_NAMESPACE}" > /dev/null 2>&1; then
+                    echo "Pod not found - may have already been deleted"
+                    exit 0
+                  fi
+                  kubectl get pod "${OPENFERO_POD}" -n "${OPENFERO_NAMESPACE}" -o wide
+                  echo "Deleting pod to trigger restart..."
+                  kubectl delete pod "${OPENFERO_POD}" -n "${OPENFERO_NAMESPACE}" --wait=false
+                  echo "Pod deletion triggered successfully"
+  priority: 75
+  enabled: true
+  deduplication:
+    enabled: true
+    ttl: 300
+---
+# =============================================================================
+# Operarius: KubeContainerWaiting
+# Priority: 65
+# =============================================================================
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
+metadata:
+  name: container-waiting-restart
+  namespace: openfero
+spec:
+  alertSelector:
+    alertname: KubeContainerWaiting
+    status: firing
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 600
+      template:
+        spec:
+          serviceAccountName: openfero-container-waiting-restarter
+          restartPolicy: Never
+          containers:
+            - name: container-waiting-restarter
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  echo "=== KubeContainerWaiting Remediation ==="
+                  echo "Pod: ${OPENFERO_POD}"
+                  echo "Namespace: ${OPENFERO_NAMESPACE}"
+                  echo "Container: ${OPENFERO_CONTAINER}"
+                  echo "Reason: ${OPENFERO_REASON}"
+                  echo ""
+                  if [ -z "${OPENFERO_POD}" ] || [ -z "${OPENFERO_NAMESPACE}" ]; then
+                    echo "ERROR: Missing required environment variables"
+                    exit 1
+                  fi
+                  if ! kubectl get pod "${OPENFERO_POD}" -n "${OPENFERO_NAMESPACE}" > /dev/null 2>&1; then
+                    echo "Pod not found - may have already been deleted"
+                    exit 0
+                  fi
+                  echo "Deleting pod to trigger reschedule..."
+                  kubectl delete pod "${OPENFERO_POD}" -n "${OPENFERO_NAMESPACE}" --wait=false
+                  echo "Pod deletion triggered successfully"
+  priority: 65
+  enabled: true
+  deduplication:
+    enabled: true
+    ttl: 300
+---
+# =============================================================================
+# Operarius: KubeJobNotCompleted
+# Priority: 35 (Lowest)
+# NOTE: Deletes still-ACTIVE jobs (and their running pods) - review before enabling!
+# =============================================================================
+apiVersion: openfero.io/v1alpha1
+kind: Operarius
+metadata:
+  name: stuck-job-cleanup
+  namespace: openfero
+spec:
+  alertSelector:
+    alertname: KubeJobNotCompleted
+    status: firing
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      ttlSecondsAfterFinished: 7200
+      template:
+        spec:
+          serviceAccountName: openfero-stuck-job-cleaner
+          restartPolicy: Never
+          containers:
+            - name: stuck-job-cleaner
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  echo "=== KubeJobNotCompleted Remediation ==="
+                  echo "Job: ${OPENFERO_JOB_NAME}"
+                  echo "Namespace: ${OPENFERO_NAMESPACE}"
+                  echo ""
+                  if [ -z "${OPENFERO_JOB_NAME}" ] || [ -z "${OPENFERO_NAMESPACE}" ]; then
+                    echo "ERROR: Missing required environment variables"
+                    exit 1
+                  fi
+                  if ! kubectl get job "${OPENFERO_JOB_NAME}" -n "${OPENFERO_NAMESPACE}" > /dev/null 2>&1; then
+                    echo "Job not found - may have already been deleted"
+                    exit 0
+                  fi
+                  kubectl get job "${OPENFERO_JOB_NAME}" -n "${OPENFERO_NAMESPACE}" -o wide
+                  POD=$(kubectl get pods -n "${OPENFERO_NAMESPACE}" -l job-name="${OPENFERO_JOB_NAME}" \
+                    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+                  [ -n "${POD}" ] && kubectl logs "${POD}" -n "${OPENFERO_NAMESPACE}" --tail=50 2>/dev/null || echo "No logs available"
+                  echo "Cleaning up stuck job..."
+                  kubectl delete job "${OPENFERO_JOB_NAME}" -n "${OPENFERO_NAMESPACE}" --ignore-not-found=true
+                  echo "Stuck job cleaned up successfully"
+  priority: 35
+  enabled: true
+  deduplication:
+    enabled: true
+    ttl: 3600

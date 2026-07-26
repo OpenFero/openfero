@@ -21,10 +21,13 @@ Production-ready Operarius CRDs for common [kube-prometheus-stack](https://githu
 | Alert                                                               | Priority | Action                | Safety          |
 | ------------------------------------------------------------------- | -------- | --------------------- | --------------- |
 | [KubePodCrashLooping](./KubePodCrashLooping/)                       | 80       | Restart pod           | Safe            |
+| [KubePodNotReady](./KubePodNotReady/)                               | 75       | Restart pod           | Safe            |
+| [KubeContainerWaiting](./KubeContainerWaiting/)                     | 65       | Restart pod           | Safe            |
 | [KubeDeploymentReplicasMismatch](./KubeDeploymentReplicasMismatch/) | 60       | Rollout restart       | Safe            |
-| [KubeJobFailed](./KubeJobFailed/)                                   | 40       | Clean up failed job   | Safe            |
-| [KubeHpaMaxedOut](./KubeHpaMaxedOut/)                               | 50       | Increase max replicas | Review capacity |
 | [KubeDaemonSetRolloutStuck](./KubeDaemonSetRolloutStuck/)           | 55       | Restart rollout       | Safe            |
+| [KubeHpaMaxedOut](./KubeHpaMaxedOut/)                               | 50       | Increase max replicas | Review capacity |
+| [KubeJobFailed](./KubeJobFailed/)                                   | 40       | Clean up failed job   | Safe            |
+| [KubeJobNotCompleted](./KubeJobNotCompleted/)                       | 35       | Clean up stuck job    | Review before enabling |
 
 ## Environment Variables
 
@@ -43,6 +46,7 @@ No manual configuration needed in your Operarius specs.
 | `OPENFERO_DAEMONSET`               | DaemonSet name        | `node-exporter`         |
 | `OPENFERO_JOB_NAME`                | Job name              | `backup-job`            |
 | `OPENFERO_HORIZONTALPODAUTOSCALER` | HPA name              | `my-app-hpa`            |
+| `OPENFERO_REASON`                  | Waiting reason        | `ImagePullBackOff`      |
 | `OPENFERO_SEVERITY`                | Alert severity        | `warning`               |
 | `OPENFERO_CLUSTER`                 | Cluster name          | `prod-us-east-1`        |
 
@@ -62,6 +66,18 @@ curl -X POST http://localhost:8080/alerts \
 # Watch job creation
 kubectl get jobs -n openfero -w
 ```
+
+## Testing with Real kube-prometheus-stack Alerts
+
+Sending a `test-alert.json` payload directly to `/alerts` (above) verifies OpenFero's matching and job-creation logic, but doesn't exercise real Prometheus rule evaluation or Alertmanager routing. To test against a real kube-prometheus-stack with alerts actually firing:
+
+```bash
+make test-e2e-kube-prometheus-stack
+```
+
+This spins up a real kube-prometheus-stack (Prometheus Operator + Alertmanager) in the E2E Kind cluster, provokes each alert's real underlying condition (e.g. a pod with an invalid image tag for `KubeContainerWaiting`), and verifies the matching remediation Job is created and the condition is resolved. See `test/e2e/kubeprometheusstack_test.go`.
+
+Since most of these alerts default to `for:` durations of 15m-1h, the test suite overrides them via kube-prometheus-stack's `customRules.<AlertName>.for` Helm value (see `test/e2e/testdata/kube-prometheus-stack-values.yaml`) so the real alert still fires off the real expression, just faster. Useful if you're adding a 9th Operarius and want to verify it end-to-end without waiting hours for a real Prometheus rule to fire.
 
 ## Prerequisites
 
