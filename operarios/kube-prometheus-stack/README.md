@@ -79,17 +79,11 @@ curl -X POST http://localhost:8080/alerts \
 kubectl get jobs -n openfero -w
 ```
 
-## Testing with Real kube-prometheus-stack Alerts
+## Automated E2E Coverage
 
-Sending a `test-alert.json` payload directly to `/alerts` (above) verifies OpenFero's matching and job-creation logic, but doesn't exercise real Prometheus rule evaluation or Alertmanager routing. To test against a real kube-prometheus-stack with alerts actually firing:
+Each Operarius has a synthetic-webhook e2e test (`test/e2e/e2e_test.go`, "Operarius Starter Pack Real-Resource Remediation") that applies the real, shipped `operarius.yaml`/`rbac.yaml`, creates a real target resource, POSTs an Alertmanager-shaped JSON payload, and verifies the remediation Job actually fixed it - this runs as part of the default `make test-e2e` and is the cheap, fast way most of this catalog's logic is covered on every change.
 
-```bash
-make test-e2e-kube-prometheus-stack
-```
-
-This spins up a real kube-prometheus-stack (Prometheus Operator + Alertmanager) in the E2E Kind cluster, provokes each alert's real underlying condition (e.g. a pod with an invalid image tag for `KubeContainerWaiting`), and verifies the matching remediation Job is created and the condition is resolved. See `test/e2e/kubeprometheusstack_test.go`.
-
-Since most of these alerts default to `for:` durations of 15m-1h, the test suite overrides them via kube-prometheus-stack's `customRules.<AlertName>.for` Helm value (see `test/e2e/testdata/kube-prometheus-stack-values.yaml`) so the real alert still fires off the real expression, just faster. Useful if you're adding a 9th Operarius and want to verify it end-to-end without waiting hours for a real Prometheus rule to fire.
+On top of that, one smoke test (`test/e2e/kubeprometheusstack_test.go`, opt-in via `make test-e2e-kube-prometheus-stack`) installs a real kube-prometheus-stack (Prometheus Operator + Alertmanager) and proves the whole pipeline - real PromQL evaluation, real Alertmanager routing, real webhook delivery to OpenFero - is genuinely wired up, using `KubeContainerWaiting` as the example. It deliberately doesn't repeat this for every alert: since these are templates rather than production-ready jobs (see the warning above), exhaustively re-proving each alert's exact upstream PromQL behavior on every CI run mostly tests kube-prometheus-stack's own rules, not OpenFero's logic, for a real cost (~10-15 extra minutes, since installing the Prometheus Operator stack is far heavier than anything else in this suite). Since it overrides only the `for:` wait duration via kube-prometheus-stack's `customRules.<AlertName>.for` Helm value (see `test/e2e/testdata/kube-prometheus-stack-values.yaml`) while keeping the real expression, it's a useful pattern to reuse ad hoc if you want to verify a *specific* alert's real behavior while developing a new Operarius.
 
 ## Prerequisites
 

@@ -1,14 +1,16 @@
-# Test-only Helm values for prometheus-community/kube-prometheus-stack,
-# used by test/e2e/kubeprometheusstack_test.go (Label("kube-prometheus-stack")).
+# Test-only Helm values for prometheus-community/kube-prometheus-stack, used
+# by the single real-alert smoke test in test/e2e/kubeprometheusstack_test.go
+# (Label("kube-prometheus-stack")).
 #
-# Goal: deploy the REAL kube-prometheus-stack alert rules and let Prometheus
-# actually evaluate them and Alertmanager actually route to OpenFero, instead
-# of posting synthetic webhook JSON - while keeping the suite fast enough for
-# CI despite most of these alerts defaulting to a 15m-1h `for:` duration.
+# Goal: deploy the REAL kube-prometheus-stack KubeContainerWaiting alert rule
+# and let Prometheus actually evaluate it and Alertmanager actually route it
+# to OpenFero - as a smoke test that the wiring works - instead of posting
+# synthetic webhook JSON as the rest of the e2e suite does.
 #
 # `customRules.<AlertName>.for` is a Helm value baked into the chart's own
 # rule templates (e.g. kubernetes-apps.yaml), so this overrides only the
-# wait duration - the underlying PromQL expression is untouched/production.
+# wait duration (default 1h) - the underlying PromQL expression is
+# untouched/production.
 
 grafana:
   enabled: false
@@ -25,27 +27,13 @@ prometheus:
   prometheusSpec:
     scrapeInterval: 5s
     evaluationInterval: 5s
-    # Default (true) restricts Prometheus to PrometheusRules carrying the
-    # chart's own release label. We need it to also pick up the
-    # KubeJobNotCompleted test-fixture rule shipped alongside this file.
-    ruleSelectorNilUsesHelmValues: false
 
 defaultRules:
   rules:
     kubernetesApps: true
-  disabled:
-    # No `for:` field and a hardcoded 12h threshold in its expr - can't be
-    # shortened via customRules. Replaced by testdata/kubejobnotcompleted-test-rule.yaml.
-    KubeJobNotCompleted: true
 
 customRules:
-  KubePodCrashLooping: { for: 10s }
   KubeContainerWaiting: { for: 10s }
-  KubePodNotReady: { for: 10s }
-  KubeDeploymentReplicasMismatch: { for: 10s }
-  KubeDaemonSetRolloutStuck: { for: 10s }
-  KubeHpaMaxedOut: { for: 10s }
-  KubeJobFailed: { for: 10s }
 
 alertmanager:
   config:
