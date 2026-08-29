@@ -1259,4 +1259,662 @@ spec:
 			}, 120*time.Second, 2*time.Second).Should(BeTrue(), "Remediation job should succeed")
 		})
 	})
+
+	// The remaining Contexts below cover the rest of the kube-prometheus-stack
+	// Operarii catalog (operarios/kube-prometheus-stack/) the same way as the
+	// two above: apply the real, shipped Operarius+RBAC (enabled for the
+	// test), create a real target resource, POST a synthetic
+	// Alertmanager-webhook JSON payload (rather than waiting on a real
+	// Prometheus to evaluate it - see kubeprometheusstack_test.go for the one
+	// smoke test that does that), and verify the remediation Job actually
+	// fixed the real resource.
+
+	Context("KubePodNotReady Remediation", func() {
+		const testNs = "e2e-podnotready-test"
+
+		BeforeEach(func() {
+			By("creating test namespace")
+			cmd := exec.Command("kubectl", "create", "namespace", testNs, "--dry-run=client", "-o", "yaml")
+			output, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+			err = utils.ApplyYAML(output)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			By("cleaning up test namespace")
+			cmd := exec.Command("kubectl", "delete", "namespace", testNs, "--ignore-not-found", "--wait=false")
+			_, _ = utils.Run(cmd)
+		})
+
+		It("should delete a pod when KubePodNotReady alert is received", func() {
+			const alertName = "KubePodNotReady"
+			operariusDir := "operarios/kube-prometheus-stack/" + alertName
+
+			By("applying the real " + alertName + " Operarius + RBAC (enabled for this test)")
+			rbacYAML := withNamespace(readRepoFile(operariusDir + "/rbac.yaml"))
+			Expect(utils.ApplyYAML(rbacYAML)).To(Succeed())
+			defer func() { _ = utils.DeleteYAML(rbacYAML) }()
+
+			operariusYAML := withEnabled(withNamespace(readRepoFile(operariusDir + "/operarius.yaml")))
+			Expect(utils.ApplyYAML(operariusYAML)).To(Succeed())
+			defer func() { _ = utils.DeleteYAML(operariusYAML) }()
+
+			time.Sleep(2 * time.Second)
+
+			podYAML := fmt.Sprintf(`
+apiVersion: v1
+kind: Pod
+metadata:
+  name: notready-victim
+  namespace: %s
+spec:
+  containers:
+  - name: main
+    image: busybox:latest
+    command: ["sleep", "3600"]
+    readinessProbe:
+      exec:
+        command: ["false"]
+      periodSeconds: 2
+      failureThreshold: 1
+  restartPolicy: Always
+`, testNs)
+			By("creating a pod that will never become ready")
+			Expect(utils.ApplyYAML(podYAML)).To(Succeed())
+
+			Eventually(func() bool {
+				cmd := exec.Command("kubectl", "get", "pod", "notready-victim", "-n", testNs,
+					"-o", "jsonpath={.status.phase}:{.status.conditions[?(@.type=='Ready')].status}")
+				output, err := utils.Run(cmd)
+				if err != nil {
+					return false
+				}
+				return strings.TrimSpace(output) == "Running:False"
+			}, 60*time.Second, 2*time.Second).Should(BeTrue(), "test pod should be Running but not Ready")
+
+			cmd := exec.Command("kubectl", "get", "pod", "notready-victim", "-n", testNs, "-o", "jsonpath={.metadata.uid}")
+			originalUID, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+
+			alertJSON := fmt.Sprintf(`{
+				"version": "4",
+				"groupKey": "e2e-podnotready-%d",
+				"status": "firing",
+				"receiver": "openfero",
+				"groupLabels": {"alertname": "%s"},
+				"commonLabels": {"alertname": "%s", "namespace": "%s", "pod": "notready-victim"},
+				"alerts": [{
+					"status": "firing",
+					"labels": {"alertname": "%s", "namespace": "%s", "pod": "notready-victim", "severity": "warning"},
+					"annotations": {"summary": "Pod has been in a non-ready state"}
+				}]
+			}`, time.Now().UnixNano(), alertName, alertName, testNs, alertName, testNs)
+
+			By("sending " + alertName + " alert to OpenFero")
+			cmd = exec.Command("curl", "-s", "-X", "POST",
+				fmt.Sprintf("http://localhost:%s/alerts", localPort),
+				"-H", "Content-Type: application/json",
+				"-d", alertJSON,
+				"-w", "\n%{http_code}",
+			)
+			output, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output).To(ContainSubstring("200"))
+
+			waitForRemediationJobSuccess(alertName)
+
+			By("verifying the original pod was deleted")
+			Eventually(func() bool {
+				cmd := exec.Command("kubectl", "get", "pod", "notready-victim", "-n", testNs,
+					"-o", "jsonpath={.metadata.uid}", "--ignore-not-found")
+				newUID, err := utils.Run(cmd)
+				if err != nil {
+					return false
+				}
+				trimmed := strings.TrimSpace(newUID)
+				return trimmed == "" || trimmed != strings.TrimSpace(originalUID)
+			}, 30*time.Second, 2*time.Second).Should(BeTrue(), "original pod should be deleted")
+		})
+	})
+
+	Context("KubeContainerWaiting Remediation", func() {
+		const testNs = "e2e-containerwaiting-test"
+
+		BeforeEach(func() {
+			By("creating test namespace")
+			cmd := exec.Command("kubectl", "create", "namespace", testNs, "--dry-run=client", "-o", "yaml")
+			output, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+			err = utils.ApplyYAML(output)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			By("cleaning up test namespace")
+			cmd := exec.Command("kubectl", "delete", "namespace", testNs, "--ignore-not-found", "--wait=false")
+			_, _ = utils.Run(cmd)
+		})
+
+		It("should delete a pod stuck waiting on a bad image when KubeContainerWaiting alert is received", func() {
+			const alertName = "KubeContainerWaiting"
+			operariusDir := "operarios/kube-prometheus-stack/" + alertName
+
+			By("applying the real " + alertName + " Operarius + RBAC (enabled for this test)")
+			rbacYAML := withNamespace(readRepoFile(operariusDir + "/rbac.yaml"))
+			Expect(utils.ApplyYAML(rbacYAML)).To(Succeed())
+			defer func() { _ = utils.DeleteYAML(rbacYAML) }()
+
+			operariusYAML := withEnabled(withNamespace(readRepoFile(operariusDir + "/operarius.yaml")))
+			Expect(utils.ApplyYAML(operariusYAML)).To(Succeed())
+			defer func() { _ = utils.DeleteYAML(operariusYAML) }()
+
+			time.Sleep(2 * time.Second)
+
+			podYAML := fmt.Sprintf(`
+apiVersion: v1
+kind: Pod
+metadata:
+  name: imagepull-victim
+  namespace: %s
+spec:
+  containers:
+  - name: main
+    image: busybox:e2e-nonexistent-tag
+    command: ["sleep", "3600"]
+  restartPolicy: Always
+`, testNs)
+			By("creating a pod referencing a nonexistent image tag")
+			Expect(utils.ApplyYAML(podYAML)).To(Succeed())
+
+			Eventually(func() string {
+				cmd := exec.Command("kubectl", "get", "pod", "imagepull-victim", "-n", testNs,
+					"-o", "jsonpath={.status.containerStatuses[0].state.waiting.reason}")
+				output, err := utils.Run(cmd)
+				if err != nil {
+					return ""
+				}
+				return strings.TrimSpace(output)
+			}, 60*time.Second, 2*time.Second).Should(Or(Equal("ImagePullBackOff"), Equal("ErrImagePull")))
+
+			cmd := exec.Command("kubectl", "get", "pod", "imagepull-victim", "-n", testNs, "-o", "jsonpath={.metadata.uid}")
+			originalUID, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+
+			alertJSON := fmt.Sprintf(`{
+				"version": "4",
+				"groupKey": "e2e-containerwaiting-%d",
+				"status": "firing",
+				"receiver": "openfero",
+				"groupLabels": {"alertname": "%s"},
+				"commonLabels": {"alertname": "%s", "namespace": "%s", "pod": "imagepull-victim"},
+				"alerts": [{
+					"status": "firing",
+					"labels": {"alertname": "%s", "namespace": "%s", "pod": "imagepull-victim", "container": "main", "reason": "ImagePullBackOff", "severity": "warning"},
+					"annotations": {"summary": "Pod container waiting longer than 1 hour"}
+				}]
+			}`, time.Now().UnixNano(), alertName, alertName, testNs, alertName, testNs)
+
+			By("sending " + alertName + " alert to OpenFero")
+			cmd = exec.Command("curl", "-s", "-X", "POST",
+				fmt.Sprintf("http://localhost:%s/alerts", localPort),
+				"-H", "Content-Type: application/json",
+				"-d", alertJSON,
+				"-w", "\n%{http_code}",
+			)
+			output, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output).To(ContainSubstring("200"))
+
+			waitForRemediationJobSuccess(alertName)
+
+			By("verifying the original pod was deleted")
+			Eventually(func() bool {
+				cmd := exec.Command("kubectl", "get", "pod", "imagepull-victim", "-n", testNs,
+					"-o", "jsonpath={.metadata.uid}", "--ignore-not-found")
+				newUID, err := utils.Run(cmd)
+				if err != nil {
+					return false
+				}
+				trimmed := strings.TrimSpace(newUID)
+				return trimmed == "" || trimmed != strings.TrimSpace(originalUID)
+			}, 30*time.Second, 2*time.Second).Should(BeTrue(), "original pod should be deleted")
+		})
+	})
+
+	Context("KubeDeploymentReplicasMismatch Remediation", func() {
+		const testNs = "e2e-deploymentmismatch-test"
+
+		BeforeEach(func() {
+			By("creating test namespace")
+			cmd := exec.Command("kubectl", "create", "namespace", testNs, "--dry-run=client", "-o", "yaml")
+			output, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+			err = utils.ApplyYAML(output)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			By("cleaning up test namespace")
+			cmd := exec.Command("kubectl", "delete", "namespace", testNs, "--ignore-not-found", "--wait=false")
+			_, _ = utils.Run(cmd)
+		})
+
+		It("should roll out restart a deployment when KubeDeploymentReplicasMismatch alert is received", func() {
+			const alertName = "KubeDeploymentReplicasMismatch"
+			operariusDir := "operarios/kube-prometheus-stack/" + alertName
+
+			By("applying the real " + alertName + " Operarius + RBAC (enabled for this test)")
+			rbacYAML := withNamespace(readRepoFile(operariusDir + "/rbac.yaml"))
+			Expect(utils.ApplyYAML(rbacYAML)).To(Succeed())
+			defer func() { _ = utils.DeleteYAML(rbacYAML) }()
+
+			operariusYAML := withEnabled(withNamespace(readRepoFile(operariusDir + "/operarius.yaml")))
+			Expect(utils.ApplyYAML(operariusYAML)).To(Succeed())
+			defer func() { _ = utils.DeleteYAML(operariusYAML) }()
+
+			time.Sleep(2 * time.Second)
+
+			// A perfectly healthy Deployment: the synthetic alert is what
+			// triggers remediation here, not a real, persistent mismatch, so
+			// the rollout restart the remediation Job performs can actually
+			// succeed (unlike a genuinely-broken pod template, which no
+			// restart can fix - see kubeprometheusstack_test.go for why the
+			// real-alert smoke test doesn't use this alert).
+			deployYAML := fmt.Sprintf(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: replica-mismatch-victim
+  namespace: %s
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: replica-mismatch-victim
+  template:
+    metadata:
+      labels:
+        app: replica-mismatch-victim
+    spec:
+      containers:
+      - name: main
+        image: busybox:latest
+        command: ["sleep", "3600"]
+`, testNs)
+			By("creating a healthy deployment")
+			Expect(utils.ApplyYAML(deployYAML)).To(Succeed())
+
+			Eventually(func() bool {
+				cmd := exec.Command("kubectl", "get", "deployment", "replica-mismatch-victim", "-n", testNs,
+					"-o", "jsonpath={.status.availableReplicas}")
+				output, err := utils.Run(cmd)
+				if err != nil {
+					return false
+				}
+				return strings.TrimSpace(output) == "1"
+			}, 60*time.Second, 2*time.Second).Should(BeTrue(), "deployment should become available")
+
+			alertJSON := fmt.Sprintf(`{
+				"version": "4",
+				"groupKey": "e2e-deploymentmismatch-%d",
+				"status": "firing",
+				"receiver": "openfero",
+				"groupLabels": {"alertname": "%s"},
+				"commonLabels": {"alertname": "%s", "namespace": "%s", "deployment": "replica-mismatch-victim"},
+				"alerts": [{
+					"status": "firing",
+					"labels": {"alertname": "%s", "namespace": "%s", "deployment": "replica-mismatch-victim", "severity": "warning"},
+					"annotations": {"summary": "Deployment has not matched the expected number of replicas"}
+				}]
+			}`, time.Now().UnixNano(), alertName, alertName, testNs, alertName, testNs)
+
+			By("sending " + alertName + " alert to OpenFero")
+			cmd := exec.Command("curl", "-s", "-X", "POST",
+				fmt.Sprintf("http://localhost:%s/alerts", localPort),
+				"-H", "Content-Type: application/json",
+				"-d", alertJSON,
+				"-w", "\n%{http_code}",
+			)
+			output, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output).To(ContainSubstring("200"))
+
+			waitForRemediationJobSuccess(alertName)
+
+			By("verifying the remediation job actually completed a rollout restart")
+			Eventually(func() string {
+				return remediationJobLogs(alertName)
+			}, 30*time.Second, 2*time.Second).Should(ContainSubstring("Deployment rollout completed"))
+		})
+	})
+
+	Context("KubeDaemonSetRolloutStuck Remediation", func() {
+		const testNs = "e2e-daemonsetstuck-test"
+
+		BeforeEach(func() {
+			By("creating test namespace")
+			cmd := exec.Command("kubectl", "create", "namespace", testNs, "--dry-run=client", "-o", "yaml")
+			output, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+			err = utils.ApplyYAML(output)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			By("cleaning up test namespace")
+			cmd := exec.Command("kubectl", "delete", "namespace", testNs, "--ignore-not-found", "--wait=false")
+			_, _ = utils.Run(cmd)
+		})
+
+		It("should roll out restart a daemonset when KubeDaemonSetRolloutStuck alert is received", func() {
+			const alertName = "KubeDaemonSetRolloutStuck"
+			operariusDir := "operarios/kube-prometheus-stack/" + alertName
+
+			By("applying the real " + alertName + " Operarius + RBAC (enabled for this test)")
+			rbacYAML := withNamespace(readRepoFile(operariusDir + "/rbac.yaml"))
+			Expect(utils.ApplyYAML(rbacYAML)).To(Succeed())
+			defer func() { _ = utils.DeleteYAML(rbacYAML) }()
+
+			operariusYAML := withEnabled(withNamespace(readRepoFile(operariusDir + "/operarius.yaml")))
+			Expect(utils.ApplyYAML(operariusYAML)).To(Succeed())
+			defer func() { _ = utils.DeleteYAML(operariusYAML) }()
+
+			time.Sleep(2 * time.Second)
+
+			// A perfectly healthy DaemonSet, for the same reason as the
+			// KubeDeploymentReplicasMismatch Context above.
+			dsYAML := fmt.Sprintf(`
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: daemonset-stuck-victim
+  namespace: %s
+spec:
+  selector:
+    matchLabels:
+      app: daemonset-stuck-victim
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: daemonset-stuck-victim
+    spec:
+      containers:
+      - name: main
+        image: busybox:latest
+        command: ["sleep", "3600"]
+`, testNs)
+			By("creating a healthy daemonset")
+			Expect(utils.ApplyYAML(dsYAML)).To(Succeed())
+
+			Eventually(func() bool {
+				cmd := exec.Command("kubectl", "get", "daemonset", "daemonset-stuck-victim", "-n", testNs,
+					"-o", "jsonpath={.status.numberAvailable}")
+				output, err := utils.Run(cmd)
+				if err != nil {
+					return false
+				}
+				return strings.TrimSpace(output) == "1"
+			}, 60*time.Second, 2*time.Second).Should(BeTrue(), "daemonset should become available")
+
+			alertJSON := fmt.Sprintf(`{
+				"version": "4",
+				"groupKey": "e2e-daemonsetstuck-%d",
+				"status": "firing",
+				"receiver": "openfero",
+				"groupLabels": {"alertname": "%s"},
+				"commonLabels": {"alertname": "%s", "namespace": "%s", "daemonset": "daemonset-stuck-victim"},
+				"alerts": [{
+					"status": "firing",
+					"labels": {"alertname": "%s", "namespace": "%s", "daemonset": "daemonset-stuck-victim", "severity": "warning"},
+					"annotations": {"summary": "DaemonSet rollout is stuck"}
+				}]
+			}`, time.Now().UnixNano(), alertName, alertName, testNs, alertName, testNs)
+
+			By("sending " + alertName + " alert to OpenFero")
+			cmd := exec.Command("curl", "-s", "-X", "POST",
+				fmt.Sprintf("http://localhost:%s/alerts", localPort),
+				"-H", "Content-Type: application/json",
+				"-d", alertJSON,
+				"-w", "\n%{http_code}",
+			)
+			output, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output).To(ContainSubstring("200"))
+
+			waitForRemediationJobSuccess(alertName)
+
+			By("verifying the remediation job actually completed a rollout restart")
+			Eventually(func() string {
+				return remediationJobLogs(alertName)
+			}, 30*time.Second, 2*time.Second).Should(ContainSubstring("DaemonSet rollout completed"))
+		})
+	})
+
+	Context("KubeHpaMaxedOut Remediation", func() {
+		const testNs = "e2e-hpamaxedout-test"
+
+		BeforeEach(func() {
+			By("creating test namespace")
+			cmd := exec.Command("kubectl", "create", "namespace", testNs, "--dry-run=client", "-o", "yaml")
+			output, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+			err = utils.ApplyYAML(output)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			By("cleaning up test namespace")
+			cmd := exec.Command("kubectl", "delete", "namespace", testNs, "--ignore-not-found", "--wait=false")
+			_, _ = utils.Run(cmd)
+		})
+
+		It("should increase maxReplicas when KubeHpaMaxedOut alert is received", func() {
+			const alertName = "KubeHpaMaxedOut"
+			operariusDir := "operarios/kube-prometheus-stack/" + alertName
+
+			By("applying the real " + alertName + " Operarius + RBAC (enabled for this test)")
+			rbacYAML := withNamespace(readRepoFile(operariusDir + "/rbac.yaml"))
+			Expect(utils.ApplyYAML(rbacYAML)).To(Succeed())
+			defer func() { _ = utils.DeleteYAML(rbacYAML) }()
+
+			operariusYAML := withEnabled(withNamespace(readRepoFile(operariusDir + "/operarius.yaml")))
+			Expect(utils.ApplyYAML(operariusYAML)).To(Succeed())
+			defer func() { _ = utils.DeleteYAML(operariusYAML) }()
+
+			time.Sleep(2 * time.Second)
+
+			deployYAML := fmt.Sprintf(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hpa-maxedout-victim
+  namespace: %s
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hpa-maxedout-victim
+  template:
+    metadata:
+      labels:
+        app: hpa-maxedout-victim
+    spec:
+      containers:
+      - name: main
+        image: busybox:latest
+        command: ["sleep", "3600"]
+`, testNs)
+			Expect(utils.ApplyYAML(deployYAML)).To(Succeed())
+
+			hpaYAML := fmt.Sprintf(`
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hpa-maxedout-victim
+  namespace: %s
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hpa-maxedout-victim
+  minReplicas: 1
+  maxReplicas: 2
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 50
+`, testNs)
+			By("creating a deployment and HPA")
+			Expect(utils.ApplyYAML(hpaYAML)).To(Succeed())
+
+			cmd := exec.Command("kubectl", "get", "hpa", "hpa-maxedout-victim", "-n", testNs, "-o", "jsonpath={.spec.maxReplicas}")
+			originalMax, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+
+			alertJSON := fmt.Sprintf(`{
+				"version": "4",
+				"groupKey": "e2e-hpamaxedout-%d",
+				"status": "firing",
+				"receiver": "openfero",
+				"groupLabels": {"alertname": "%s"},
+				"commonLabels": {"alertname": "%s", "namespace": "%s", "horizontalpodautoscaler": "hpa-maxedout-victim"},
+				"alerts": [{
+					"status": "firing",
+					"labels": {"alertname": "%s", "namespace": "%s", "horizontalpodautoscaler": "hpa-maxedout-victim", "severity": "warning"},
+					"annotations": {"summary": "HPA is running at max replicas"}
+				}]
+			}`, time.Now().UnixNano(), alertName, alertName, testNs, alertName, testNs)
+
+			By("sending " + alertName + " alert to OpenFero")
+			cmd = exec.Command("curl", "-s", "-X", "POST",
+				fmt.Sprintf("http://localhost:%s/alerts", localPort),
+				"-H", "Content-Type: application/json",
+				"-d", alertJSON,
+				"-w", "\n%{http_code}",
+			)
+			output, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output).To(ContainSubstring("200"))
+
+			waitForRemediationJobSuccess(alertName)
+
+			By("verifying maxReplicas was increased")
+			Eventually(func() string {
+				cmd := exec.Command("kubectl", "get", "hpa", "hpa-maxedout-victim", "-n", testNs, "-o", "jsonpath={.spec.maxReplicas}")
+				output, err := utils.Run(cmd)
+				if err != nil {
+					return ""
+				}
+				return strings.TrimSpace(output)
+			}, 30*time.Second, 2*time.Second).ShouldNot(Equal(strings.TrimSpace(originalMax)), "maxReplicas should have been increased")
+		})
+	})
+
+	Context("KubeJobNotCompleted Remediation", func() {
+		const testNs = "e2e-jobnotcompleted-test"
+
+		BeforeEach(func() {
+			By("creating test namespace")
+			cmd := exec.Command("kubectl", "create", "namespace", testNs, "--dry-run=client", "-o", "yaml")
+			output, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+			err = utils.ApplyYAML(output)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			By("cleaning up test namespace")
+			cmd := exec.Command("kubectl", "delete", "namespace", testNs, "--ignore-not-found", "--wait=false")
+			_, _ = utils.Run(cmd)
+		})
+
+		It("should delete a still-active job when KubeJobNotCompleted alert is received", func() {
+			const alertName = "KubeJobNotCompleted"
+			operariusDir := "operarios/kube-prometheus-stack/" + alertName
+
+			By("applying the real " + alertName + " Operarius + RBAC (enabled for this test)")
+			rbacYAML := withNamespace(readRepoFile(operariusDir + "/rbac.yaml"))
+			Expect(utils.ApplyYAML(rbacYAML)).To(Succeed())
+			defer func() { _ = utils.DeleteYAML(rbacYAML) }()
+
+			operariusYAML := withEnabled(withNamespace(readRepoFile(operariusDir + "/operarius.yaml")))
+			Expect(utils.ApplyYAML(operariusYAML)).To(Succeed())
+			defer func() { _ = utils.DeleteYAML(operariusYAML) }()
+
+			time.Sleep(2 * time.Second)
+
+			jobYAML := fmt.Sprintf(`
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: stuck-job-victim
+  namespace: %s
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      containers:
+      - name: main
+        image: busybox:latest
+        command: ["sleep", "3600"]
+      restartPolicy: Never
+`, testNs)
+			By("creating a still-active job")
+			Expect(utils.ApplyYAML(jobYAML)).To(Succeed())
+
+			Eventually(func() bool {
+				cmd := exec.Command("kubectl", "get", "pods", "-n", testNs,
+					"-l", "job-name=stuck-job-victim",
+					"-o", "jsonpath={.items[0].status.phase}")
+				output, err := utils.Run(cmd)
+				if err != nil {
+					return false
+				}
+				return strings.TrimSpace(output) == "Running"
+			}, 60*time.Second, 2*time.Second).Should(BeTrue(), "job's pod should be running")
+
+			alertJSON := fmt.Sprintf(`{
+				"version": "4",
+				"groupKey": "e2e-jobnotcompleted-%d",
+				"status": "firing",
+				"receiver": "openfero",
+				"groupLabels": {"alertname": "%s"},
+				"commonLabels": {"alertname": "%s", "namespace": "%s", "job_name": "stuck-job-victim"},
+				"alerts": [{
+					"status": "firing",
+					"labels": {"alertname": "%s", "namespace": "%s", "job_name": "stuck-job-victim", "severity": "warning"},
+					"annotations": {"summary": "Job did not complete in time"}
+				}]
+			}`, time.Now().UnixNano(), alertName, alertName, testNs, alertName, testNs)
+
+			By("sending " + alertName + " alert to OpenFero")
+			cmd := exec.Command("curl", "-s", "-X", "POST",
+				fmt.Sprintf("http://localhost:%s/alerts", localPort),
+				"-H", "Content-Type: application/json",
+				"-d", alertJSON,
+				"-w", "\n%{http_code}",
+			)
+			output, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output).To(ContainSubstring("200"))
+
+			waitForRemediationJobSuccess(alertName)
+
+			By("verifying the stuck job was deleted")
+			Eventually(func() bool {
+				cmd := exec.Command("kubectl", "get", "job", "stuck-job-victim", "-n", testNs, "--ignore-not-found")
+				output, err := utils.Run(cmd)
+				if err != nil {
+					return false
+				}
+				return strings.TrimSpace(output) == ""
+			}, 30*time.Second, 2*time.Second).Should(BeTrue(), "stuck job should have been deleted")
+		})
+	})
 })
