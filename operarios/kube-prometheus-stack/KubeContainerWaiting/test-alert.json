@@ -1,0 +1,46 @@
+{
+  "version": "4",
+  "groupKey": "{}/{}:{alertname=\"KubeContainerWaiting\"}",
+  "status": "firing",
+  "receiver": "openfero",
+  "groupLabels": {
+    "alertname": "KubeContainerWaiting"
+  },
+  "commonLabels": {
+    "alertname": "KubeContainerWaiting",
+    "severity": "warning",
+    "namespace": "default",
+    "pod": "test-imagepull-pod",
+    "container": "main",
+    "cluster": "test-cluster"
+  },
+  "commonAnnotations": {
+    "description": "Pod default/test-imagepull-pod container main has been in waiting state for longer than 1 hour.",
+    "summary": "Pod container waiting longer than 1 hour."
+  },
+  "externalURL": "http://alertmanager:9093",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "KubeContainerWaiting",
+        "severity": "warning",
+        "namespace": "default",
+        "pod": "test-imagepull-pod",
+        "container": "main",
+        "cluster": "test-cluster",
+        "endpoint": "http",
+        "job": "kube-state-metrics",
+        "reason": "ImagePullBackOff"
+      },
+      "annotations": {
+        "description": "Pod default/test-imagepull-pod container main has been in waiting state for longer than 1 hour.",
+        "summary": "Pod container waiting longer than 1 hour.",
+        "runbook_url": "https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubecontainerwaiting"
+      },
+      "startsAt": "2025-01-01T00:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://prometheus:9090/graph"
+    }
+  ]
+}

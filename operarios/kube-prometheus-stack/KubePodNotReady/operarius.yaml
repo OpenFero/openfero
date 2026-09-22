@@ -1,13 +1,13 @@
 apiVersion: openfero.io/v1alpha1
 kind: Operarius
 metadata:
-  name: pod-crashloop-restart
+  name: pod-not-ready-restart
   namespace: openfero
 spec:
   alertSelector:
-    alertname: KubePodCrashLooping
+    alertname: KubePodNotReady
     status: firing
-    # This template matches every KubePodCrashLooping alert cluster-wide by
+    # This template matches every KubePodNotReady alert cluster-wide by
     # default. Restarting a pod is safe in general, but whether it's the
     # RIGHT reaction still depends on the workload - scope this to your own
     # environment before enabling. Any label already present on the alert
@@ -23,20 +23,19 @@ spec:
       ttlSecondsAfterFinished: 600
       template:
         spec:
-          serviceAccountName: openfero-pod-restarter
+          serviceAccountName: openfero-pod-not-ready-restarter
           restartPolicy: Never
           containers:
-            - name: pod-restarter
+            - name: pod-not-ready-restarter
               image: bitnami/kubectl:latest
               command:
                 - /bin/sh
                 - -c
                 - |
                   set -e
-                  echo "=== KubePodCrashLooping Remediation ==="
+                  echo "=== KubePodNotReady Remediation ==="
                   echo "Pod: ${OPENFERO_POD}"
                   echo "Namespace: ${OPENFERO_NAMESPACE}"
-                  echo "Container: ${OPENFERO_CONTAINER}"
                   echo ""
 
                   # Validate required variables
@@ -51,6 +50,10 @@ spec:
                     exit 0
                   fi
 
+                  echo "Pod status:"
+                  kubectl get pod "${OPENFERO_POD}" -n "${OPENFERO_NAMESPACE}" -o wide
+                  echo ""
+
                   # Delete pod to trigger fresh restart
                   echo "Deleting pod to trigger restart..."
                   kubectl delete pod "${OPENFERO_POD}" -n "${OPENFERO_NAMESPACE}" --wait=false
@@ -64,7 +67,7 @@ spec:
                     exit 1
                   fi
 
-  priority: 80
+  priority: 75
   # Template: review scope/priority/dedup above, then flip to true.
   enabled: false
 
