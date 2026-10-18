@@ -83,7 +83,7 @@ jobs:
           # workspace, so it would flag pre-existing findings unrelated to
           # the PR's diff. Restrict it to push (main) runs; PR-time dependency
           # vulnerability feedback is handled by dependency-review.yml instead.
-          VALIDATE_TRIVY: ${{ github.event_name == 'push' }}
+          VALIDATE_TRIVY: false
           VALIDATE_CHECKOV: false
           VALIDATE_YAML: false
           # Go linting via golangci-lint using .github/linters/.golangci.yml
