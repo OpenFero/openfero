@@ -33,6 +33,7 @@ var _ = Describe("Authentication", Ordered, func() {
 			"--namespace", namespace,
 			"--set", "service.type=ClusterIP",
 			"--set", "persistentVolume.enabled=false",
+			"--set", "configmapReload.enabled=false",
 			"--wait")
 		_, err = utils.Run(cmd)
 		Expect(err).NotTo(HaveOccurred())
@@ -214,13 +215,32 @@ func configureAlertmanager(url, user, pass, token string) {
 		"--namespace", namespace,
 		"--set", "service.type=ClusterIP",
 		"--set", "persistentVolume.enabled=false",
+		"--set", "configmapReload.enabled=false",
 		"-f", tmpFile.Name(),
 		"--wait")
 	output, err := utils.Run(cmd)
 	Expect(err).NotTo(HaveOccurred(), "Alertmanager configuration failed: %s", output)
 
-	// Wait a bit for Alertmanager to reload config
-	time.Sleep(5 * time.Second)
+	// Wait for Alertmanager to be ready and have the expected configuration active
+	Eventually(func() string {
+		cmd := exec.Command("kubectl", "exec", "curl", "-n", namespace, "--", "curl", "-s", "http://alertmanager:9093/api/v2/status")
+		out, _ := utils.Run(cmd)
+		return out
+	}, 60*time.Second, 2*time.Second).Should(ContainSubstring("openfero"), "Alertmanager status is not reachable or openfero is not configured")
+
+	if user != "" {
+		Eventually(func() string {
+			cmd := exec.Command("kubectl", "exec", "curl", "-n", namespace, "--", "curl", "-s", "http://alertmanager:9093/api/v2/status")
+			out, _ := utils.Run(cmd)
+			return out
+		}, 30*time.Second, 1*time.Second).Should(ContainSubstring(user), "Alertmanager did not activate basic auth user in config")
+	} else if token != "" {
+		Eventually(func() string {
+			cmd := exec.Command("kubectl", "exec", "curl", "-n", namespace, "--", "curl", "-s", "http://alertmanager:9093/api/v2/status")
+			out, _ := utils.Run(cmd)
+			return out
+		}, 30*time.Second, 1*time.Second).Should(ContainSubstring(token), "Alertmanager did not activate bearer token in config")
+	}
 }
 
 func triggerAlert(alertName string) {
@@ -242,7 +262,7 @@ func dumpAlertmanagerLogs() string {
 func verifyAlertReceived(alertName string) {
 	By(fmt.Sprintf("Verifying alert received: %s", alertName))
 	Eventually(func() string {
-		cmd := exec.Command("kubectl", "logs", "-l", "app.kubernetes.io/name=openfero", "-n", namespace, "--tail=100")
+		cmd := exec.Command("kubectl", "logs", "-l", "app.kubernetes.io/name=openfero", "-n", namespace, "--tail=500")
 		output, _ := utils.Run(cmd)
 		return output
 	}, 60*time.Second, 2*time.Second).Should(ContainSubstring(alertName), "Alertmanager logs:\n%s", dumpAlertmanagerLogs())
@@ -252,14 +272,14 @@ func verifyAlertRejected(alertName string) {
 	By(fmt.Sprintf("Verifying alert rejected: %s", alertName))
 	// We check that the alert does NOT appear in logs for a while
 	Consistently(func() string {
-		cmd := exec.Command("kubectl", "logs", "-l", "app.kubernetes.io/name=openfero", "-n", namespace, "--tail=100")
+		cmd := exec.Command("kubectl", "logs", "-l", "app.kubernetes.io/name=openfero", "-n", namespace, "--tail=500")
 		out, _ := utils.Run(cmd)
 		return out
 	}, 10*time.Second, 1*time.Second).ShouldNot(ContainSubstring(alertName))
 
 	// Also check for "Authentication failed" log
 	Eventually(func() string {
-		cmd := exec.Command("kubectl", "logs", "-l", "app.kubernetes.io/name=openfero", "-n", namespace, "--tail=100")
+		cmd := exec.Command("kubectl", "logs", "-l", "app.kubernetes.io/name=openfero", "-n", namespace, "--tail=500")
 		out, _ := utils.Run(cmd)
 		return out
 	}, 10*time.Second, 1*time.Second).Should(ContainSubstring("Authentication failed"))
