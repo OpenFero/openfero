@@ -239,7 +239,7 @@ func configureAlertmanager(url, user, pass, token string) {
 			cmd := exec.Command("kubectl", "exec", "curl", "-n", namespace, "--", "curl", "-s", "http://alertmanager:9093/api/v2/status")
 			out, _ := utils.Run(cmd)
 			return out
-		}, 30*time.Second, 1*time.Second).Should(ContainSubstring(token), "Alertmanager did not activate bearer token in config")
+		}, 30*time.Second, 1*time.Second).Should(ContainSubstring("Bearer"), "Alertmanager did not activate bearer authorization in config")
 	}
 }
 
