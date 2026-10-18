@@ -72,6 +72,25 @@ spec:
       severity: critical
 ```
 
+### Scope Narrowly - Don't Match on Alertname Alone
+
+An alert name alone doesn't tell you whether your remediation is the *right* reaction for every workload that happens to trigger it - that depends on the specific workload/team/environment. Matching purely on `alertname` + `status` means an Operarius fires for **every** occurrence of that alert cluster-wide, which is convenient but risky: it assumes one fix is correct everywhere.
+
+Prefer adding `alertSelector.labels` to scope an Operarius to where you've actually verified the remediation is appropriate, e.g.:
+
+```yaml
+spec:
+  alertSelector:
+    alertname: DiskSpaceLow
+    status: firing
+    labels:
+      namespace: my-app-namespace
+```
+
+Any label already present on the incoming alert works here. Note that arbitrary Kubernetes object labels (e.g. a custom `team: platform` label on a Deployment) are **not** automatically part of an alert's label set - kube-state-metrics only exposes object labels it's explicitly configured to allow (`--metric-labels-allowlist`), and the alerting rule itself must join on them for the label to reach Alertmanager. `namespace`, `severity`, and whatever labels the alerting rule already emits are the labels you can rely on out of the box.
+
+For the same reason, consider shipping new Operarii with `spec.enabled: false` by default (see [Best Practices](#8-disabled-by-default)) so enabling one is a conscious, reviewed decision rather than something that happens automatically on `kubectl apply`.
+
 ### Job Template
 
 The `jobTemplate` field embeds a standard Kubernetes `JobTemplateSpec`. This means you can use any feature available in standard Kubernetes Jobs:
@@ -371,6 +390,17 @@ spec:
         spec:
           restartPolicy: Never  # Required for Jobs
 ```
+
+### 8. Disabled by Default
+
+Ship new Operarii with `spec.enabled: false` so they're inert until someone has actually reviewed the remediation and scoped its `alertSelector` (see [Scope Narrowly](#scope-narrowly---dont-match-on-alertname-alone)) to their environment:
+
+```yaml
+spec:
+  enabled: false  # Flip to true only after reviewing scope/labels above
+```
+
+This turns "enable this Operarius" into a conscious decision instead of something that silently starts remediating the whole cluster the moment the CRD is applied.
 
 ## Example Implementations
 

@@ -1,0 +1,43 @@
+{
+  "version": "4",
+  "groupKey": "{}/{}:{alertname=\"KubeJobNotCompleted\"}",
+  "status": "firing",
+  "receiver": "openfero",
+  "groupLabels": {
+    "alertname": "KubeJobNotCompleted"
+  },
+  "commonLabels": {
+    "alertname": "KubeJobNotCompleted",
+    "severity": "warning",
+    "namespace": "default",
+    "job_name": "test-stuck-job",
+    "cluster": "test-cluster"
+  },
+  "commonAnnotations": {
+    "description": "Job default/test-stuck-job is taking more than 12 hours to complete.",
+    "summary": "Job did not complete in time."
+  },
+  "externalURL": "http://alertmanager:9093",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "KubeJobNotCompleted",
+        "severity": "warning",
+        "namespace": "default",
+        "job_name": "test-stuck-job",
+        "cluster": "test-cluster",
+        "endpoint": "http",
+        "job": "kube-state-metrics"
+      },
+      "annotations": {
+        "description": "Job default/test-stuck-job is taking more than 12 hours to complete.",
+        "summary": "Job did not complete in time.",
+        "runbook_url": "https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubejobnotcompleted"
+      },
+      "startsAt": "2025-01-01T00:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://prometheus:9090/graph"
+    }
+  ]
+}

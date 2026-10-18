@@ -66,7 +66,11 @@ E2E_NAMESPACE ?= openfero
 
 .PHONY: test-e2e
 test-e2e: test-e2e-setup ## Run E2E tests (requires Kind)
-	KIND=$(KIND) KIND_CLUSTER=$(KIND_CLUSTER_NAME) E2E_NAMESPACE=$(E2E_NAMESPACE) $(GOTEST) -v -tags=e2e ./test/e2e/... -timeout 30m
+	KIND=$(KIND) KIND_CLUSTER=$(KIND_CLUSTER_NAME) E2E_NAMESPACE=$(E2E_NAMESPACE) $(GOTEST) -v -tags=e2e ./test/e2e/... -timeout 30m -args -ginkgo.label-filter="!kube-prometheus-stack"
+
+.PHONY: test-e2e-kube-prometheus-stack
+test-e2e-kube-prometheus-stack: test-e2e-setup ## Run E2E tests with a real kube-prometheus-stack evaluating alerts (slow, opt-in)
+	KIND=$(KIND) KIND_CLUSTER=$(KIND_CLUSTER_NAME) E2E_NAMESPACE=$(E2E_NAMESPACE) $(GOTEST) -v -tags=e2e ./test/e2e/... -timeout 30m -args -ginkgo.label-filter="kube-prometheus-stack"
 
 .PHONY: test-e2e-setup
 test-e2e-setup: ## Set up Kind cluster for E2E tests
