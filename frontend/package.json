@@ -18,12 +18,12 @@
     "check": "biome check ."
   },
   "dependencies": {
-    "pinia": "^4.0.3",
-    "vue": "^3.5.43",
+    "pinia": "^4.1.0",
+    "vue": "^3.5.44",
     "vue-router": "^5.4.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.15",
+    "@biomejs/biome": "2.6.2",
     "@tailwindcss/vite": "^4.3.3",
     "@tsconfig/node24": "^24.0.5",
     "@types/jsdom": "^30.0.0",
@@ -33,16 +33,16 @@
     "@vue/eslint-config-typescript": "^14.9.0",
     "@vue/test-utils": "^2.5.1",
     "@vue/tsconfig": "^0.9.1",
-    "eslint": "^10.12.0",
+    "eslint": "^10.13.0",
     "eslint-plugin-vue": "~10.11.1",
     "jiti": "^2.7.0",
-    "jsdom": "^30.1.2",
+    "jsdom": "^30.1.3",
     "npm-run-all2": "^9.0.3",
     "tailwindcss": "^4.1.17",
     "typescript": "~6.0.3",
-    "vite": "^8.3.4",
+    "vite": "^8.3.5",
     "vite-plugin-vue-devtools": "^8.2.1",
-    "vitest": "^5.0.3",
+    "vitest": "^5.0.5",
     "vue-tsc": "^3.3.13"
   }
 }
