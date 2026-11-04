@@ -1,0 +1,52 @@
+# Test-only Helm values for prometheus-community/kube-prometheus-stack, used
+# by the single real-alert smoke test in test/e2e/kubeprometheusstack_test.go
+# (Label("kube-prometheus-stack")).
+#
+# Goal: deploy the REAL kube-prometheus-stack KubeContainerWaiting alert rule
+# and let Prometheus actually evaluate it and Alertmanager actually route it
+# to OpenFero - as a smoke test that the wiring works - instead of posting
+# synthetic webhook JSON as the rest of the e2e suite does.
+#
+# `customRules.<AlertName>.for` is a Helm value baked into the chart's own
+# rule templates (e.g. kubernetes-apps.yaml), so this overrides only the
+# wait duration (default 1h) - the underlying PromQL expression is
+# untouched/production.
+
+grafana:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: false
+
+prometheus:
+  prometheusSpec:
+    scrapeInterval: 5s
+    evaluationInterval: 5s
+
+defaultRules:
+  rules:
+    kubernetesApps: true
+
+customRules:
+  KubeContainerWaiting: { for: 10s }
+
+alertmanager:
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ["alertname"]
+      group_wait: 0s
+      group_interval: 1s
+      repeat_interval: 1s
+      receiver: openfero
+    receivers:
+      - name: openfero
+        webhook_configs:
+          - url: http://openfero:8080/alerts
+            send_resolved: true
