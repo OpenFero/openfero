@@ -1,12 +1,22 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
-import { RouterView } from 'vue-router'
+import { onMounted, useTemplateRef, watch } from 'vue'
+import { RouterView, useRoute } from 'vue-router'
 import { NavBar } from '@/components'
 import { useTheme } from '@/composables'
 import { useAppStore, useSocketStore } from '@/stores'
 
 // Initialize theme
 useTheme()
+
+const route = useRoute()
+const backToTop = useTemplateRef<HTMLElement>('backToTop')
+
+watch(
+  () => route.path,
+  () => {
+    backToTop.value?.focus()
+  },
+)
 
 // Load build info and connect socket on mount
 const appStore = useAppStore()
@@ -19,8 +29,23 @@ onMounted(() => {
 </script>
 
 <template>
+  <span
+    ref="backToTop"
+    tabindex="-1"
+    class="sr-only"
+  />
+  <a
+    href="#main"
+    class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[1100] focus:px-4 focus:py-2 focus:bg-white focus:dark:bg-gray-800 focus:text-gray-900 focus:dark:text-white focus:rounded-md focus:shadow-lg focus:ring-2 focus:ring-primary-500"
+  >
+    Skip to main content
+  </a>
   <NavBar />
-  <main class="pt-16 min-h-screen bg-gray-50 dark:bg-[#121218]">
+  <main
+    id="main"
+    tabindex="-1"
+    class="pt-16 min-h-screen bg-gray-50 dark:bg-[#121218] focus:outline-none"
+  >
     <RouterView />
   </main>
 </template>

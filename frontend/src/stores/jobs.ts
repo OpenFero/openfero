@@ -1,12 +1,12 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { ref, shallowRef, watch } from 'vue'
 import { fetchJobs } from '@/api/alerts'
 import { ApiError } from '@/api/client'
 import type { JobInfo } from '@/types'
 import { useSocketStore } from './socket'
 
 export const useJobsStore = defineStore('jobs', () => {
-  const jobs = ref<JobInfo[]>([])
+  const jobs = shallowRef<JobInfo[]>([])
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const isBackendUnavailable = ref(false)
@@ -43,9 +43,9 @@ export const useJobsStore = defineStore('jobs', () => {
   function updateJob(updatedJob: JobInfo) {
     const index = jobs.value.findIndex((j) => j.operariusName === updatedJob.operariusName)
     if (index !== -1) {
-      jobs.value[index] = updatedJob
+      jobs.value = jobs.value.map((job, idx) => (idx === index ? updatedJob : job))
     } else {
-      jobs.value.push(updatedJob)
+      jobs.value = [...jobs.value, updatedJob]
     }
   }
 
