@@ -169,3 +169,51 @@ func TestHandleOperariusBasedJobs_ConcurrentDeduplication(t *testing.T) {
 	assert.Equal(t, 1, successCount, "exactly one request should have created the real job")
 	assert.Equal(t, concurrency-1, skippedCount, "all other requests should be marked as deduplicated")
 }
+
+// TestHandleOperariusBasedJobs_DryRun verifies that an Operarius with DryRun=true
+// does not create a Kubernetes Job, does not increment ExecutionCount, and records
+// the skipped status in both the Operarius status and the alert store.
+func TestHandleOperariusBasedJobs_DryRun(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	op := dedupTestOperarius()
+	op.Spec.Deduplication = nil
+	op.Spec.DryRun = true
+
+	operariusClient := &stubOperariusClient{
+		namespace: "openfero",
+		operarii:  []operariusv1alpha1.Operarius{op},
+	}
+
+	server := &Server{
+		KubeClient:       nil,
+		AlertStore:       memory.NewMemoryStore(100),
+		OperariusService: services.NewOperariusServiceWithClient(kubeClient, operariusClient),
+	}
+	require.NoError(t, server.AlertStore.Initialize())
+
+	hookMessage := models.HookMessage{
+		Status:   "firing",
+		GroupKey: "dryrun-group",
+		Alerts: []models.Alert{
+			{Labels: map[string]string{"alertname": "TestAlert"}},
+		},
+	}
+
+	failedBefore := testutil.ToFloat64(metadata.JobsFailedTotal)
+	server.handleOperariusBasedJobs(context.Background(), hookMessage)
+
+	jobs, err := kubeClient.BatchV1().Jobs("openfero").List(context.Background(), metav1.ListOptions{})
+	require.NoError(t, err)
+	assert.Empty(t, jobs.Items, "dry-run Operarius must not create a Job")
+
+	assert.Equal(t, failedBefore, testutil.ToFloat64(metadata.JobsFailedTotal), "dry-run must not increment JobsFailedTotal")
+
+	entries, err := server.AlertStore.GetAlerts("", 0)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	require.NotNil(t, entries[0].JobInfo)
+	assert.Equal(t, "N/A (DryRun)", entries[0].JobInfo.JobName)
+	assert.Equal(t, "Skipped: DryRun", entries[0].JobInfo.LastExecutionStatus)
+	assert.Equal(t, "busybox", entries[0].JobInfo.Image)
+	assert.Equal(t, int32(0), entries[0].JobInfo.ExecutionCount)
+}

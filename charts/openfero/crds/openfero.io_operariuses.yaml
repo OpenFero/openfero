@@ -42,6 +42,9 @@ spec:
     - jsonPath: .status.executionCount
       name: Executions
       type: integer
+    - jsonPath: .status.lastExecutionStatus
+      name: LastStatus
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -105,6 +108,10 @@ spec:
                     format: int32
                     type: integer
                 type: object
+              dryRun:
+                description: DryRun indicates whether this Operarius should simulate
+                  job creation without actually creating a Kubernetes Job.
+                type: boolean
               enabled:
                 default: true
                 description: Enabled indicates whether this Operarius is enabled

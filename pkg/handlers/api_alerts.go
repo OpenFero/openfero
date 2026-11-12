@@ -134,6 +134,14 @@ func (s *Server) handleOperariusBasedJobs(ctx context.Context, hookMessage model
 							"operarius", operarius.Name)
 						metadata.JobsFailedTotal.Inc()
 					}
+				} else if operarius.Spec.DryRun {
+					log.Info("Dry-run mode: skipping Kubernetes job creation",
+						"operarius", operarius.Name,
+						"namespace", job.Namespace,
+						"image", getFirstContainerImage(job),
+						"groupKey", hookMessage.GroupKey)
+
+					jobInfo = s.buildSkippedJobInfo(ctx, operarius, "N/A (DryRun)", getFirstContainerImage(job), "Skipped: DryRun")
 				} else {
 
 					log.Info("Successfully created remediation job",
@@ -186,10 +194,17 @@ func (s *Server) handleOperariusBasedJobs(ctx context.Context, hookMessage model
 // buildDedupSkippedJobInfo marks the Operarius' dedup status and returns the
 // JobInfo describing a job creation that was skipped due to deduplication.
 func (s *Server) buildDedupSkippedJobInfo(ctx context.Context, operarius *operariusv1alpha1.Operarius) *alertstore.JobInfo {
-	if err := s.OperariusService.UpdateOperariusDedupStatus(ctx, operarius); err != nil {
-		log.Warn("Failed to update Operarius dedup status",
+	return s.buildSkippedJobInfo(ctx, operarius, "N/A (Deduplicated)", "N/A", "Skipped: Deduplication")
+}
+
+// buildSkippedJobInfo updates the Operarius' skipped status and returns the
+// JobInfo describing a job creation that was skipped (e.g., deduplication or dry-run).
+func (s *Server) buildSkippedJobInfo(ctx context.Context, operarius *operariusv1alpha1.Operarius, jobName, image, status string) *alertstore.JobInfo {
+	if err := s.OperariusService.UpdateOperariusSkippedStatus(ctx, operarius, status); err != nil {
+		log.Warn("Failed to update Operarius skipped status",
 			"error", err,
-			"operarius", operarius.Name)
+			"operarius", operarius.Name,
+			"status", status)
 	}
 
 	var lastExecutionTime *time.Time
@@ -199,14 +214,14 @@ func (s *Server) buildDedupSkippedJobInfo(ctx context.Context, operarius *operar
 	}
 
 	return &alertstore.JobInfo{
-		JobName:             "N/A (Deduplicated)",
+		JobName:             jobName,
 		Namespace:           operarius.Namespace,
 		OperariusName:       operarius.Name,
-		Image:               "N/A",
+		Image:               image,
 		ExecutionCount:      operarius.Status.ExecutionCount,
 		LastExecutionTime:   lastExecutionTime,
 		LastExecutedJobName: operarius.Status.LastExecutedJobName,
-		LastExecutionStatus: "Skipped: Deduplication",
+		LastExecutionStatus: status,
 	}
 }
 

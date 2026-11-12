@@ -74,6 +74,20 @@ const hasAnnotations = computed(() => {
           >
             No Remediation
           </span>
+          <span
+            v-else-if="(alert.jobInfo.status || alert.jobInfo.lastExecutionStatus) === 'Skipped: DryRun'"
+            class="px-2 py-0.5 text-xs font-medium bg-amber-400/25 text-white rounded border border-amber-200/40"
+            title="Simulated in dry-run mode without creating a Kubernetes Job"
+          >
+            Dry-Run
+          </span>
+          <span
+            v-else-if="(alert.jobInfo.status || alert.jobInfo.lastExecutionStatus) === 'Skipped: Deduplication'"
+            class="px-2 py-0.5 text-xs font-medium bg-black/20 text-white rounded border border-white/20"
+            title="Skipped due to deduplication"
+          >
+            Deduplicated
+          </span>
         </div>
         <svg
           class="w-5 h-5 transition-transform duration-200"
@@ -176,7 +190,7 @@ const hasAnnotations = computed(() => {
               <div>
                 <strong class="text-gray-700 dark:text-gray-300">Status:</strong>
                 <span class="ml-1 font-mono text-gray-600 dark:text-gray-400">{{ alert.jobInfo.status ||
-                  '-' }}</span>
+                  alert.jobInfo.lastExecutionStatus || '-' }}</span>
               </div>
               <div>
                 <strong class="text-gray-700 dark:text-gray-300">Image:</strong>

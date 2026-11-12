@@ -46,6 +46,8 @@ export interface JobInfo {
   lastExecutionTime?: string
   /** Name of the last job created */
   lastExecutedJobName?: string
+  /** Last execution status (e.g., Skipped: DryRun, Skipped: Deduplication) */
+  lastExecutionStatus?: string
   /** Latest available observations of an Operarius's state */
   conditions?: JobCondition[]
   /** Job execution status */

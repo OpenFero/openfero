@@ -2336,3 +2336,38 @@ func TestCheckDeduplication_JobOutsideTTL(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, shouldCreate, "Should create job when existing job is outside TTL window")
 }
+
+// TestCreateJobFromOperarius_DryRun verifies that DryRun renders the Job
+// (including labels, env vars, and templates) without creating it in Kubernetes.
+func TestCreateJobFromOperarius_DryRun(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	service := NewOperariusService(kubeClient)
+
+	operarius := dedupOperariusFixture(nil)
+	operarius.Spec.DryRun = true
+	operarius.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Args = []string{
+		"echo {{ .Alert.Labels.pod }}",
+	}
+
+	hookMessage := models.HookMessage{
+		Status:   "firing",
+		GroupKey: "dryrun-group",
+		Alerts: []models.Alert{
+			{Labels: map[string]string{"alertname": "TestAlert", "pod": "web-123"}},
+		},
+	}
+
+	ctx := context.TODO()
+	job, err := service.CreateJobFromOperarius(ctx, operarius, hookMessage)
+	require.NoError(t, err)
+	require.NotNil(t, job)
+
+	// Template and OpenFero metadata should still be rendered
+	assert.Equal(t, "TestAlert", job.Labels["openfero.io/alert"])
+	assert.Equal(t, []string{"echo web-123"}, job.Spec.Template.Spec.Containers[0].Args)
+
+	// No Job must be created in Kubernetes
+	jobs, err := kubeClient.BatchV1().Jobs(operarius.Namespace).List(ctx, metav1.ListOptions{})
+	require.NoError(t, err)
+	assert.Empty(t, jobs.Items, "dry-run must not create any Kubernetes Job")
+}
