@@ -62,6 +62,8 @@ type JobInfo struct {
 	ExecutionCount int32 `json:"executionCount"`
 	// Last time a job was created from this Operarius
 	LastExecutionTime *time.Time `json:"lastExecutionTime,omitempty"`
+	// Last time an alert matched this Operarius (including dry-run and deduplication)
+	LastTriggeredTime *time.Time `json:"lastTriggeredTime,omitempty"`
 	// Name of the last job created
 	LastExecutedJobName string `json:"lastExecutedJobName,omitempty"`
 	// Status of the last execution

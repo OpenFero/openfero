@@ -91,6 +91,7 @@ func (s *Server) handleOperariusBasedJobs(ctx context.Context, hookMessage model
 		"alertCount", len(hookMessage.Alerts))
 
 	var jobInfo *alertstore.JobInfo
+	outcome := "unmatched"
 
 	operarii, err := s.OperariusService.GetOperariiForNamespace(ctx, "")
 	if err != nil {
@@ -117,6 +118,7 @@ func (s *Server) handleOperariusBasedJobs(ctx context.Context, hookMessage model
 					"groupKey", hookMessage.GroupKey)
 
 				jobInfo = s.buildDedupSkippedJobInfo(ctx, operarius)
+				outcome = "deduplicated"
 			} else {
 				// Create the job
 				job, err := s.OperariusService.CreateJobFromOperarius(ctx, operarius, hookMessage)
@@ -128,11 +130,13 @@ func (s *Server) handleOperariusBasedJobs(ctx context.Context, hookMessage model
 							"operarius", operarius.Name,
 							"groupKey", hookMessage.GroupKey)
 						jobInfo = s.buildDedupSkippedJobInfo(ctx, operarius)
+						outcome = "deduplicated"
 					} else {
 						log.Error("Failed to create job from Operarius",
 							"error", err,
 							"operarius", operarius.Name)
 						metadata.JobsFailedTotal.Inc()
+						outcome = "failed"
 					}
 				} else if operarius.Spec.DryRun {
 					log.Info("Dry-run mode: skipping Kubernetes job creation",
@@ -142,7 +146,9 @@ func (s *Server) handleOperariusBasedJobs(ctx context.Context, hookMessage model
 						"groupKey", hookMessage.GroupKey)
 
 					jobInfo = s.buildSkippedJobInfo(ctx, operarius, "N/A (DryRun)", getFirstContainerImage(job), "Skipped: DryRun")
+					outcome = "dry_run"
 				} else {
+					outcome = "executed"
 
 					log.Info("Successfully created remediation job",
 						"jobName", job.Name,
@@ -181,6 +187,13 @@ func (s *Server) handleOperariusBasedJobs(ctx context.Context, hookMessage model
 
 	// Store alert in alert store for tracking and broadcast to SSE clients
 	for _, alert := range hookMessage.Alerts {
+		alertStatus := hookMessage.Status
+		if alertStatus == "" {
+			alertStatus = "unknown"
+		}
+		metadata.AlertsReceivedTotal.WithLabelValues(alertStatus).Inc()
+		metadata.AlertsMatchedTotal.WithLabelValues(outcome).Inc()
+
 		if jobInfo != nil {
 			// Use the service function which handles both storage and SSE broadcast
 			services.SaveAlertWithJobInfo(s.AlertStore, alert, hookMessage.Status, jobInfo)

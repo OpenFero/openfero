@@ -21,6 +21,7 @@ describe('JobTable', () => {
       dryRun: true,
       priority: 10,
       executionCount: 0,
+      lastTriggeredTime: '2026-11-12T22:00:00Z',
       status: 'Skipped: DryRun',
     },
   ]
@@ -62,6 +63,7 @@ describe('JobTable', () => {
     expect(wrapper.text()).toContain('firing')
     expect(wrapper.text()).toContain('severity=critical')
     expect(wrapper.text()).toContain('1 alert')
+    expect(wrapper.text()).toContain('Triggered: Formatted: 2026-11-12T22:00:00Z')
 
     const link = wrapper.findComponent(RouterLinkStub)
     expect(link.props('to')).toEqual({

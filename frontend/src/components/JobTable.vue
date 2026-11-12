@@ -125,7 +125,7 @@ const getStatusColor = (status?: string) => {
                 scope="col"
                 class="px-4 py-3"
               >
-                Last Execution
+                Last Triggered / Job
               </th>
               <th
                 scope="col"
@@ -219,16 +219,29 @@ const getStatusColor = (status?: string) => {
                   {{ job.executionCount || 0 }}
                 </td>
                 <td class="px-4 py-3 text-gray-600 dark:text-gray-400">
-                  <div v-if="job.lastExecutionTime">
-                    {{ formatDate(job.lastExecutionTime) }}
-                    <div
-                      v-if="job.lastExecutedJobName"
-                      class="text-xs text-gray-400 mt-1"
-                    >
-                      {{ job.lastExecutedJobName }}
+                  <div
+                    v-if="job.lastTriggeredTime || job.lastExecutionTime"
+                    class="space-y-1 text-xs"
+                  >
+                    <div v-if="job.lastTriggeredTime">
+                      <span class="text-gray-400">Triggered:</span>
+                      {{ formatDate(job.lastTriggeredTime) }}
+                    </div>
+                    <div v-if="job.lastExecutionTime">
+                      <span class="text-gray-400">Job:</span>
+                      {{ formatDate(job.lastExecutionTime) }}
+                      <div
+                        v-if="job.lastExecutedJobName"
+                        class="text-gray-400 mt-0.5 font-mono"
+                      >
+                        {{ job.lastExecutedJobName }}
+                      </div>
                     </div>
                   </div>
-                  <span v-else>-</span>
+                  <span
+                    v-else
+                    class="text-xs italic text-gray-400"
+                  >Never triggered</span>
                 </td>
                 <td class="px-4 py-3">
                   <span

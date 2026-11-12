@@ -200,6 +200,7 @@ func TestHandleOperariusBasedJobs_DryRun(t *testing.T) {
 	}
 
 	failedBefore := testutil.ToFloat64(metadata.JobsFailedTotal)
+	dryRunBefore := testutil.ToFloat64(metadata.AlertsMatchedTotal.WithLabelValues("dry_run"))
 	server.handleOperariusBasedJobs(context.Background(), hookMessage)
 
 	jobs, err := kubeClient.BatchV1().Jobs("openfero").List(context.Background(), metav1.ListOptions{})
@@ -207,6 +208,13 @@ func TestHandleOperariusBasedJobs_DryRun(t *testing.T) {
 	assert.Empty(t, jobs.Items, "dry-run Operarius must not create a Job")
 
 	assert.Equal(t, failedBefore, testutil.ToFloat64(metadata.JobsFailedTotal), "dry-run must not increment JobsFailedTotal")
+	assert.Equal(t, dryRunBefore+1, testutil.ToFloat64(metadata.AlertsMatchedTotal.WithLabelValues("dry_run")), "dry-run must increment dry_run outcome counter")
+
+	updatedOp, err := operariusClient.Get(op.Name)
+	require.NoError(t, err)
+	require.NotNil(t, updatedOp)
+	assert.NotNil(t, updatedOp.Status.LastTriggeredTime, "dry-run match must record LastTriggeredTime")
+	assert.Nil(t, updatedOp.Status.LastExecutionTime, "dry-run must not set LastExecutionTime")
 
 	entries, err := server.AlertStore.GetAlerts("", 0)
 	require.NoError(t, err)

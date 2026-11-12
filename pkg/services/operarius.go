@@ -436,7 +436,7 @@ func (s *OperariusService) UpdateOperariusDedupStatus(ctx context.Context, opera
 	return s.UpdateOperariusSkippedStatus(ctx, operarius, "Skipped: Deduplication")
 }
 
-// UpdateOperariusSkippedStatus updates only the LastExecutionStatus field of an Operarius
+// UpdateOperariusSkippedStatus updates LastExecutionStatus and LastTriggeredTime of an Operarius
 // when a job creation is skipped (e.g., deduplication or dry-run). It does not increment
 // ExecutionCount or change LastExecutionTime / LastExecutedJobName.
 func (s *OperariusService) UpdateOperariusSkippedStatus(ctx context.Context, operarius *operariusv1alpha1.Operarius, status string) error {
@@ -445,7 +445,9 @@ func (s *OperariusService) UpdateOperariusSkippedStatus(ctx context.Context, ope
 		return nil
 	}
 
+	now := metav1.Now()
 	operarius.Status.LastExecutionStatus = status
+	operarius.Status.LastTriggeredTime = &now
 
 	if err := s.operariusClient.UpdateStatus(ctx, operarius); err != nil {
 		return fmt.Errorf("failed to update Operarius skipped status: %w", err)
@@ -469,6 +471,7 @@ func (s *OperariusService) UpdateOperariusStatus(ctx context.Context, operarius 
 	now := metav1.Now()
 	operarius.Status.ExecutionCount++
 	operarius.Status.LastExecutionTime = &now
+	operarius.Status.LastTriggeredTime = &now
 	operarius.Status.LastExecutedJobName = jobName
 	operarius.Status.LastExecutionStatus = "Pending"
 
@@ -570,6 +573,14 @@ func (s *OperariusService) ToJobInfo(op operariusv1alpha1.Operarius) models.JobI
 		lastExecutionTime = &t
 	}
 
+	var lastTriggeredTime *time.Time
+	if op.Status.LastTriggeredTime != nil {
+		t := op.Status.LastTriggeredTime.Time
+		lastTriggeredTime = &t
+	}
+
+	enabled := op.Spec.Enabled == nil || *op.Spec.Enabled
+
 	return models.JobInfo{
 		OperariusName:       op.Name,
 		JobName:             op.Spec.AlertSelector.AlertName,
@@ -577,7 +588,13 @@ func (s *OperariusService) ToJobInfo(op operariusv1alpha1.Operarius) models.JobI
 		Image:               image,
 		ExecutionCount:      op.Status.ExecutionCount,
 		LastExecutionTime:   lastExecutionTime,
+		LastTriggeredTime:   lastTriggeredTime,
 		LastExecutedJobName: op.Status.LastExecutedJobName,
 		LastExecutionStatus: op.Status.LastExecutionStatus,
+		AlertStatus:         op.Spec.AlertSelector.Status,
+		AlertLabels:         op.Spec.AlertSelector.Labels,
+		DryRun:              op.Spec.DryRun,
+		Enabled:             &enabled,
+		Priority:            op.Spec.Priority,
 	}
 }

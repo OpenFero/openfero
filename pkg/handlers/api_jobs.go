@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"time"
 
 	log "github.com/OpenFero/openfero/pkg/logging"
 	"github.com/OpenFero/openfero/pkg/models"
@@ -33,34 +32,7 @@ func (s *Server) JobsAPIHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			log.Debug("Retrieved Operarii", "count", len(operarii))
 			for _, op := range operarii {
-				image := "unknown"
-				if len(op.Spec.JobTemplate.Spec.Template.Spec.Containers) > 0 {
-					image = op.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
-				}
-
-				var lastExecutionTime *time.Time
-				if op.Status.LastExecutionTime != nil {
-					t := op.Status.LastExecutionTime.Time
-					lastExecutionTime = &t
-				}
-
-				enabled := op.Spec.Enabled == nil || *op.Spec.Enabled
-
-				jobInfos = append(jobInfos, models.JobInfo{
-					OperariusName:       op.Name,
-					JobName:             op.Spec.AlertSelector.AlertName, // Use AlertName as JobName for display
-					Namespace:           op.Namespace,
-					Image:               image,
-					ExecutionCount:      op.Status.ExecutionCount,
-					LastExecutionTime:   lastExecutionTime,
-					LastExecutedJobName: op.Status.LastExecutedJobName,
-					LastExecutionStatus: op.Status.LastExecutionStatus,
-					AlertStatus:         op.Spec.AlertSelector.Status,
-					AlertLabels:         op.Spec.AlertSelector.Labels,
-					DryRun:              op.Spec.DryRun,
-					Enabled:             &enabled,
-					Priority:            op.Spec.Priority,
-				})
+				jobInfos = append(jobInfos, s.OperariusService.ToJobInfo(op))
 			}
 		}
 	}
