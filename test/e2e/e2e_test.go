@@ -778,10 +778,10 @@ spec:
 
 			By("verifying Operarius status records Skipped: DryRun")
 			Eventually(func() string {
-				cmd := exec.Command("kubectl", "get", "operarius", dryRunOperariusName,
+				statusCmd := exec.Command("kubectl", "get", "operarius", dryRunOperariusName,
 					"-n", namespace, "-o", "jsonpath={.status.lastExecutionStatus}")
-				out, err := utils.Run(cmd)
-				if err != nil {
+				out, statusErr := utils.Run(statusCmd)
+				if statusErr != nil {
 					return ""
 				}
 				return strings.TrimSpace(out)

@@ -93,7 +93,7 @@ spec:
 | `spec.alertSelector` | `AlertSelector`        | Alert matching criteria          | Yes      |
 | `spec.priority`      | `int32`                | Selection priority (higher wins) | No       |
 | `spec.enabled`       | `*bool`                | Enable/disable operarius         | No       |
-| `spec.dryRun`        | `bool`                 | Simulate job creation without creating a Kubernetes Job | No       |
+| `spec.dryRun`        | `bool`                 | Simulate without creating a Job  | No       |
 | `spec.deduplication` | `*DeduplicationConfig` | Deduplication settings           | No       |
 
 ### AlertSelector
