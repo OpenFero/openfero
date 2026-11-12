@@ -44,6 +44,8 @@ func (s *Server) JobsAPIHandler(w http.ResponseWriter, r *http.Request) {
 					lastExecutionTime = &t
 				}
 
+				enabled := op.Spec.Enabled == nil || *op.Spec.Enabled
+
 				jobInfos = append(jobInfos, models.JobInfo{
 					OperariusName:       op.Name,
 					JobName:             op.Spec.AlertSelector.AlertName, // Use AlertName as JobName for display
@@ -53,6 +55,11 @@ func (s *Server) JobsAPIHandler(w http.ResponseWriter, r *http.Request) {
 					LastExecutionTime:   lastExecutionTime,
 					LastExecutedJobName: op.Status.LastExecutedJobName,
 					LastExecutionStatus: op.Status.LastExecutionStatus,
+					AlertStatus:         op.Spec.AlertSelector.Status,
+					AlertLabels:         op.Spec.AlertSelector.Labels,
+					DryRun:              op.Spec.DryRun,
+					Enabled:             &enabled,
+					Priority:            op.Spec.Priority,
 				})
 			}
 		}

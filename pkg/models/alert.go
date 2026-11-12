@@ -66,6 +66,16 @@ type JobInfo struct {
 	LastExecutedJobName string `json:"lastExecutedJobName,omitempty"`
 	// Status of the last execution
 	LastExecutionStatus string `json:"status,omitempty"`
+	// AlertStatus from the Operarius alertSelector
+	AlertStatus string `json:"alertStatus,omitempty"`
+	// AlertLabels from the Operarius alertSelector
+	AlertLabels map[string]string `json:"alertLabels,omitempty"`
+	// DryRun indicates whether the Operarius simulates job creation
+	DryRun bool `json:"dryRun,omitempty"`
+	// Enabled indicates whether the Operarius is active
+	Enabled *bool `json:"enabled,omitempty"`
+	// Priority of the Operarius rule
+	Priority int32 `json:"priority,omitempty"`
 }
 
 // ToAlertStoreAlert converts an Alert to alertstore.Alert

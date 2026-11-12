@@ -1,13 +1,25 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { AlertCard, BaseErrorState, BaseSpinner } from '@/components'
 import { useAlertsStore, useSocketStore } from '@/stores'
 import type { AlertStoreEntry } from '@/types'
 
+const route = useRoute()
 const alertsStore = useAlertsStore()
 const socketStore = useSocketStore()
 const expandedAlerts = ref<Set<string>>(new Set())
 let hasInitializedExpansion = false
+
+watch(
+  () => route.query.q,
+  (q) => {
+    if (typeof q === 'string') {
+      alertsStore.setSearchQuery(q)
+    }
+  },
+  { immediate: true },
+)
 
 function getAlertKey(entry: AlertStoreEntry): string {
   return `${entry.alert.labels.alertname || 'unknown'}-${entry.timestamp}`

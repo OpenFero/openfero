@@ -56,6 +56,16 @@ export interface JobInfo {
   startedAt?: string
   /** Time when the job completed */
   completedAt?: string
+  /** Alert status matched by the Operarius alertSelector */
+  alertStatus?: string
+  /** Alert labels matched by the Operarius alertSelector */
+  alertLabels?: Record<string, string>
+  /** Whether the Operarius runs in dry-run mode */
+  dryRun?: boolean
+  /** Whether the Operarius is enabled */
+  enabled?: boolean
+  /** Priority of the Operarius rule */
+  priority?: number
 }
 
 /**

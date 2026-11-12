@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 import { useDateTime } from '@/composables/useDateTime'
 import type { AlertStoreEntry } from '@/types'
 
@@ -184,8 +185,12 @@ const hasAnnotations = computed(() => {
               </div>
               <div>
                 <strong class="text-gray-700 dark:text-gray-300">Source:</strong>
-                <span class="ml-1 font-mono text-gray-600 dark:text-gray-400">{{
-                  alert.jobInfo.operariusName }}</span>
+                <RouterLink
+                  :to="{ name: 'jobs', query: { operarius: alert.jobInfo.operariusName } }"
+                  class="ml-1 font-mono text-primary-600 dark:text-primary-400 hover:underline"
+                >
+                  {{ alert.jobInfo.operariusName }}
+                </RouterLink>
               </div>
               <div>
                 <strong class="text-gray-700 dark:text-gray-300">Status:</strong>
