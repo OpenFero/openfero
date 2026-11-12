@@ -1,12 +1,12 @@
 import { defineStore } from 'pinia'
-import { computed, ref, watch } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import { fetchAlerts } from '@/api/alerts'
 import { ApiError } from '@/api/client'
 import type { AlertStoreEntry } from '@/types'
 import { useSocketStore } from './socket'
 
 export const useAlertsStore = defineStore('alerts', () => {
-  const alerts = ref<AlertStoreEntry[]>([])
+  const alerts = shallowRef<AlertStoreEntry[]>([])
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const isBackendUnavailable = ref(false)
@@ -27,14 +27,25 @@ export const useAlertsStore = defineStore('alerts', () => {
   const resolvedAlerts = computed(() => alerts.value.filter((a) => a.status === 'resolved'))
 
   const filteredAlerts = computed(() => {
-    if (!searchQuery.value) return alerts.value
-    const query = searchQuery.value.toLowerCase()
+    const trimmed = searchQuery.value.trim()
+    if (!trimmed) return alerts.value
+
+    const query = trimmed.toLowerCase()
     return alerts.value.filter((entry) => {
-      const alertName = entry.alert.labels.alertname || ''
-      const labels = Object.entries(entry.alert.labels)
-        .map(([k, v]) => `${k}:${v}`)
-        .join(' ')
-      return alertName.toLowerCase().includes(query) || labels.toLowerCase().includes(query)
+      const alertName = entry.alert.labels.alertname?.toLowerCase() || ''
+      const status = entry.status.toLowerCase()
+
+      const labelsMatch = Object.entries(entry.alert.labels).some(
+        ([key, value]) =>
+          key.toLowerCase().includes(query) || String(value).toLowerCase().includes(query),
+      )
+
+      const annotationsMatch = Object.entries(entry.alert.annotations || {}).some(
+        ([key, value]) =>
+          key.toLowerCase().includes(query) || String(value).toLowerCase().includes(query),
+      )
+
+      return alertName.includes(query) || status.includes(query) || labelsMatch || annotationsMatch
     })
   })
 
@@ -62,7 +73,7 @@ export const useAlertsStore = defineStore('alerts', () => {
   }
 
   function addAlert(alert: AlertStoreEntry) {
-    alerts.value.unshift(alert)
+    alerts.value = [alert, ...alerts.value]
   }
 
   function updateAlertJobStatus(
@@ -71,7 +82,11 @@ export const useAlertsStore = defineStore('alerts', () => {
   ) {
     const alert = alerts.value[alertIndex]
     if (alert?.jobInfo) {
-      alert.jobInfo.status = status
+      alerts.value = alerts.value.map((entry, idx) =>
+        idx === alertIndex && entry.jobInfo
+          ? { ...entry, jobInfo: { ...entry.jobInfo, status } }
+          : entry,
+      )
     }
   }
 

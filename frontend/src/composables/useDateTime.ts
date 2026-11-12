@@ -7,6 +7,31 @@ export interface DateFormatOptions {
   timeStyle?: 'full' | 'long' | 'medium' | 'short'
 }
 
+const dateFormatterCache = new Map<string, Intl.DateTimeFormat>()
+const relativeFormatterCache = new Map<string, Intl.RelativeTimeFormat>()
+
+function getDateFormatter(
+  locale: string,
+  options: Intl.DateTimeFormatOptions,
+): Intl.DateTimeFormat {
+  const key = `${locale}|${JSON.stringify(options)}`
+  let formatter = dateFormatterCache.get(key)
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, options)
+    dateFormatterCache.set(key, formatter)
+  }
+  return formatter
+}
+
+function getRelativeFormatter(locale: string): Intl.RelativeTimeFormat {
+  let formatter = relativeFormatterCache.get(locale)
+  if (!formatter) {
+    formatter = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
+    relativeFormatterCache.set(locale, formatter)
+  }
+  return formatter
+}
+
 /**
  * Composable for formatting dates according to the user's browser locale.
  * Uses Intl.DateTimeFormat for proper localization.
@@ -36,7 +61,7 @@ export function useDateTime() {
 
       // Use dateStyle/timeStyle if provided (simpler API)
       if (dateStyle || timeStyle) {
-        const formatter = new Intl.DateTimeFormat(userLocale.value, {
+        const formatter = getDateFormatter(userLocale.value, {
           dateStyle,
           timeStyle,
         })
@@ -58,7 +83,7 @@ export function useDateTime() {
         formatOptions.timeZoneName = 'short'
       }
 
-      const formatter = new Intl.DateTimeFormat(userLocale.value, formatOptions)
+      const formatter = getDateFormatter(userLocale.value, formatOptions)
       let formatted = formatter.format(date)
 
       // Add milliseconds if requested
@@ -106,7 +131,7 @@ export function useDateTime() {
         options.second = '2-digit'
       }
 
-      return new Intl.DateTimeFormat(userLocale.value, options).format(date)
+      return getDateFormatter(userLocale.value, options).format(date)
     } catch {
       return String(dateInput)
     }
@@ -130,9 +155,7 @@ export function useDateTime() {
       const diffHours = Math.round(diffMinutes / 60)
       const diffDays = Math.round(diffHours / 24)
 
-      const rtf = new Intl.RelativeTimeFormat(userLocale.value, {
-        numeric: 'auto',
-      })
+      const rtf = getRelativeFormatter(userLocale.value)
 
       if (Math.abs(diffSeconds) < 60) {
         return rtf.format(diffSeconds, 'second')
