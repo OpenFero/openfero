@@ -2,6 +2,8 @@
 
 Automatically triggers a rollout restart when a deployment's replicas don't match the expected count.
 
+> **Template**: ships with `spec.enabled: false` and no scope restriction. A rollout restart only fixes *transient* problems - it recreates pods from the same template, so it cannot fix a persistent misconfiguration. Review, scope `alertSelector.labels` to your environment, then enable - see [the catalog warning](../README.md#%EF%B8%8F-these-are-templates-not-install-and-forget).
+
 ## Alert Definition
 
 Source: [kube-prometheus-stack kubernetes-apps.yaml](https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/kubernetes-apps.yaml)
@@ -48,6 +50,8 @@ OpenFero automatically provides these from the alert labels:
 kubectl apply -f rbac.yaml
 kubectl apply -f operarius.yaml
 ```
+
+This applies the Operarius **disabled**. Edit `operarius.yaml` to scope `alertSelector.labels` to your environment (see the commented example inside), set `spec.enabled: true`, then re-apply.
 
 ## Testing
 
