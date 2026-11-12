@@ -230,4 +230,29 @@ describe('AlertCard', () => {
       expect(heading.attributes('id')).toBe('headingalert-42')
     })
   })
+
+  describe('dry-run status display', () => {
+    it('should display Dry-Run badge and Skipped: DryRun status', () => {
+      const dryRunAlert = {
+        ...mockAlert,
+        jobInfo: {
+          operariusName: 'demo-dryrun-op',
+          jobName: 'N/A (DryRun)',
+          image: 'busybox:latest',
+          lastExecutionStatus: 'Skipped: DryRun',
+        },
+      }
+      const wrapper = mount(AlertCard, {
+        props: {
+          alert: dryRunAlert,
+          index: 0,
+          expanded: true,
+        },
+      })
+
+      expect(wrapper.text()).toContain('Dry-Run')
+      expect(wrapper.text()).toContain('N/A (DryRun)')
+      expect(wrapper.text()).toContain('Skipped: DryRun')
+    })
+  })
 })

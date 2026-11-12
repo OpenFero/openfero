@@ -45,7 +45,16 @@ export const useAlertsStore = defineStore('alerts', () => {
           key.toLowerCase().includes(query) || String(value).toLowerCase().includes(query),
       )
 
-      return alertName.includes(query) || status.includes(query) || labelsMatch || annotationsMatch
+      const jobInfoMatch = entry.jobInfo
+        ? [
+            entry.jobInfo.jobName,
+            entry.jobInfo.operariusName,
+            entry.jobInfo.status,
+            entry.jobInfo.lastExecutionStatus,
+          ].some((val) => val?.toLowerCase().includes(query))
+        : false
+
+      return alertName.includes(query) || status.includes(query) || labelsMatch || annotationsMatch || jobInfoMatch
     })
   })
 
