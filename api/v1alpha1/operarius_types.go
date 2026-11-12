@@ -119,7 +119,3 @@ type OperariusList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Operarius `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&Operarius{}, &OperariusList{})
-}

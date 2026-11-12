@@ -113,29 +113,29 @@ func getRestConfig(kubeconfig *string) (*rest.Config, error) {
 func (c *OperariusClient) InitOperariusInformer(ctx context.Context) (cache.Store, error) {
 	// Create list/watch functions using REST client
 	parameterCodec := runtime.NewParameterCodec(c.scheme)
-	listFunc := func(options metav1.ListOptions) (runtime.Object, error) {
+	listFunc := func(listCtx context.Context, options metav1.ListOptions) (runtime.Object, error) {
 		return c.restClient.Get().
 			Namespace(c.namespace).
 			Resource("operariuses").
 			SpecificallyVersionedParams(&options, parameterCodec, metav1.SchemeGroupVersion).
-			Do(ctx).
+			Do(listCtx).
 			Get()
 	}
 
-	watchFunc := func(options metav1.ListOptions) (watch.Interface, error) {
+	watchFunc := func(watchCtx context.Context, options metav1.ListOptions) (watch.Interface, error) {
 		options.Watch = true
 		return c.restClient.Get().
 			Namespace(c.namespace).
 			Resource("operariuses").
 			SpecificallyVersionedParams(&options, parameterCodec, metav1.SchemeGroupVersion).
-			Watch(ctx)
+			Watch(watchCtx)
 	}
 
 	// Create informer with list (watch uses resync)
 	c.informer = cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc:  listFunc,
-			WatchFunc: watchFunc,
+			ListWithContextFunc:  listFunc,
+			WatchFuncWithContext: watchFunc,
 		},
 		&operariusv1alpha1.Operarius{},
 		time.Minute*1, // Resync period for cache updates
