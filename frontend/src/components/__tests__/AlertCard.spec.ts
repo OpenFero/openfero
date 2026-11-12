@@ -239,7 +239,7 @@ describe('AlertCard', () => {
           operariusName: 'demo-dryrun-op',
           jobName: 'N/A (DryRun)',
           image: 'busybox:latest',
-          lastExecutionStatus: 'Skipped: DryRun',
+          status: 'Skipped: DryRun',
         },
       }
       const wrapper = mount(AlertCard, {
