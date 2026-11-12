@@ -72,6 +72,11 @@ type OperariusSpec struct {
 	// Deduplication defines deduplication settings for this Operarius
 	// +optional
 	Deduplication *DeduplicationConfig `json:"deduplication,omitempty"`
+
+	// DryRun indicates whether this Operarius should simulate job creation
+	// without actually creating a Kubernetes Job.
+	// +optional
+	DryRun bool `json:"dryRun,omitempty"`
 }
 
 // OperariusStatus defines the observed state of Operarius
@@ -100,6 +105,7 @@ type OperariusStatus struct {
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.spec.alertSelector.status`
 // +kubebuilder:printcolumn:name="Enabled",type=boolean,JSONPath=`.spec.enabled`
 // +kubebuilder:printcolumn:name="Executions",type=integer,JSONPath=`.status.executionCount`
+// +kubebuilder:printcolumn:name="LastStatus",type=string,JSONPath=`.status.lastExecutionStatus`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // Operarius is the Schema for the operarii API

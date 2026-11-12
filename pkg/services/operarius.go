@@ -235,6 +235,11 @@ func (s *OperariusService) CreateJobFromOperarius(ctx context.Context, operarius
 		return nil, fmt.Errorf("failed to apply template variables: %w", err)
 	}
 
+	// In dry-run mode, return the rendered job without creating it in Kubernetes
+	if operarius.Spec.DryRun {
+		return job, nil
+	}
+
 	// Create the job in Kubernetes
 	createdJob, err := s.kubeClient.BatchV1().Jobs(job.Namespace).Create(ctx, job, metav1.CreateOptions{})
 	if err != nil {
@@ -428,19 +433,27 @@ func (s *OperariusService) GetOperariiForNamespace(ctx context.Context, namespac
 // when a job creation is skipped due to deduplication. It does not increment ExecutionCount
 // or change LastExecutionTime / LastExecutedJobName.
 func (s *OperariusService) UpdateOperariusDedupStatus(ctx context.Context, operarius *operariusv1alpha1.Operarius) error {
+	return s.UpdateOperariusSkippedStatus(ctx, operarius, "Skipped: Deduplication")
+}
+
+// UpdateOperariusSkippedStatus updates only the LastExecutionStatus field of an Operarius
+// when a job creation is skipped (e.g., deduplication or dry-run). It does not increment
+// ExecutionCount or change LastExecutionTime / LastExecutedJobName.
+func (s *OperariusService) UpdateOperariusSkippedStatus(ctx context.Context, operarius *operariusv1alpha1.Operarius, status string) error {
 	if s.operariusClient == nil {
-		log.Debug("No Operarius client configured, skipping dedup status update")
+		log.Debug("No Operarius client configured, skipping status update")
 		return nil
 	}
 
-	operarius.Status.LastExecutionStatus = "Skipped: Deduplication"
+	operarius.Status.LastExecutionStatus = status
 
 	if err := s.operariusClient.UpdateStatus(ctx, operarius); err != nil {
-		return fmt.Errorf("failed to update Operarius dedup status: %w", err)
+		return fmt.Errorf("failed to update Operarius skipped status: %w", err)
 	}
 
-	log.Debug("Updated Operarius dedup status",
-		"operarius", operarius.Name)
+	log.Debug("Updated Operarius skipped status",
+		"operarius", operarius.Name,
+		"status", status)
 
 	return nil
 }

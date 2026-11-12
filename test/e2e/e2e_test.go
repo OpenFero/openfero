@@ -715,6 +715,88 @@ spec:
 		})
 	})
 
+	Context("DryRun Operarius", func() {
+		const dryRunOperariusName = "e2e-dryrun-operarius"
+
+		BeforeEach(func() {
+			operariusYAML := fmt.Sprintf(`apiVersion: openfero.io/v1alpha1
+kind: Operarius
+metadata:
+  name: %s
+  namespace: %s
+spec:
+  alertSelector:
+    alertname: E2EDryRunAlert
+    status: firing
+  dryRun: true
+  priority: 100
+  enabled: true
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: dryrun
+              image: busybox:1.36
+              command: ["echo", "should-not-run"]
+`, dryRunOperariusName, namespace)
+
+			cmd := exec.Command("kubectl", "apply", "-f", "-")
+			cmd.Stdin = strings.NewReader(operariusYAML)
+			_, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			cmd := exec.Command("kubectl", "delete", "operarius", dryRunOperariusName,
+				"-n", namespace, "--ignore-not-found=true")
+			_, _ = utils.Run(cmd)
+		})
+
+		It("should update status to Skipped: DryRun without creating a Job", func() {
+			alertJSON := `{
+				"receiver": "openfero",
+				"status": "firing",
+				"groupKey": "e2e-dryrun-group",
+				"alerts": [{
+					"status": "firing",
+					"labels": {
+						"alertname": "E2EDryRunAlert",
+						"severity": "warning"
+					}
+				}]
+			}`
+
+			cmd := exec.Command("curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
+				"-X", "POST", fmt.Sprintf("http://localhost:%s/alerts", localPort),
+				"-H", "Content-Type: application/json",
+				"-d", alertJSON)
+			output, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(strings.TrimSpace(output)).To(Equal("200"))
+
+			By("verifying Operarius status records Skipped: DryRun")
+			Eventually(func() string {
+				cmd := exec.Command("kubectl", "get", "operarius", dryRunOperariusName,
+					"-n", namespace, "-o", "jsonpath={.status.lastExecutionStatus}")
+				out, err := utils.Run(cmd)
+				if err != nil {
+					return ""
+				}
+				return strings.TrimSpace(out)
+			}, 20*time.Second, time.Second).Should(Equal("Skipped: DryRun"))
+
+			By("verifying no Job was created for the dry-run Operarius")
+			cmd = exec.Command("kubectl", "get", "jobs", "-n", namespace,
+				"-l", fmt.Sprintf("openfero.io/operarius=%s", dryRunOperariusName),
+				"-o", "jsonpath={.items[*].metadata.name}")
+			jobOut, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(strings.TrimSpace(jobOut)).To(BeEmpty())
+		})
+	})
+
 	Context("Health Endpoints", func() {
 		It("should respond to healthz endpoint", func() {
 			cmd := exec.Command("curl", "-s",
