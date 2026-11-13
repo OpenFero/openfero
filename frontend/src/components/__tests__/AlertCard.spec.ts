@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { mount, RouterLinkStub } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AlertStoreEntry } from '@/types'
 import AlertCard from '../AlertCard.vue'
@@ -248,11 +248,21 @@ describe('AlertCard', () => {
           index: 0,
           expanded: true,
         },
+        global: {
+          stubs: {
+            RouterLink: RouterLinkStub,
+          },
+        },
       })
 
       expect(wrapper.text()).toContain('Dry-Run')
       expect(wrapper.text()).toContain('N/A (DryRun)')
       expect(wrapper.text()).toContain('Skipped: DryRun')
+      const link = wrapper.findComponent(RouterLinkStub)
+      expect(link.props('to')).toEqual({
+        name: 'jobs',
+        query: { operarius: 'demo-dryrun-op' },
+      })
     })
   })
 })

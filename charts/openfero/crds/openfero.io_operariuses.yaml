@@ -45,6 +45,9 @@ spec:
     - jsonPath: .status.lastExecutionStatus
       name: LastStatus
       type: string
+    - jsonPath: .status.lastTriggeredTime
+      name: LastTriggered
+      type: date
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -9098,6 +9101,11 @@ spec:
               lastExecutionTime:
                 description: LastExecutionTime represents the last time a job was
                   created from this Operarius
+                format: date-time
+                type: string
+              lastTriggeredTime:
+                description: LastTriggeredTime represents the last time an alert matched
+                  this Operarius
                 format: date-time
                 type: string
             type: object

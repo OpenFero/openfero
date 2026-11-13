@@ -96,6 +96,10 @@ type OperariusStatus struct {
 	// LastExecutionStatus represents the status of the last execution
 	// +optional
 	LastExecutionStatus string `json:"lastExecutionStatus,omitempty"`
+
+	// LastTriggeredTime represents the last time an alert matched this Operarius
+	// +optional
+	LastTriggeredTime *metav1.Time `json:"lastTriggeredTime,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -106,6 +110,7 @@ type OperariusStatus struct {
 // +kubebuilder:printcolumn:name="Enabled",type=boolean,JSONPath=`.spec.enabled`
 // +kubebuilder:printcolumn:name="Executions",type=integer,JSONPath=`.status.executionCount`
 // +kubebuilder:printcolumn:name="LastStatus",type=string,JSONPath=`.status.lastExecutionStatus`
+// +kubebuilder:printcolumn:name="LastTriggered",type=date,JSONPath=`.status.lastTriggeredTime`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // Operarius is the Schema for the operarii API

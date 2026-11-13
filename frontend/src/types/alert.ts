@@ -44,6 +44,8 @@ export interface JobInfo {
   executionCount?: number
   /** Last time a job was created from this Operarius */
   lastExecutionTime?: string
+  /** Last time an alert matched this Operarius (including dry-run and deduplication) */
+  lastTriggeredTime?: string
   /** Name of the last job created */
   lastExecutedJobName?: string
   /** Last execution status (e.g., Skipped: DryRun, Skipped: Deduplication) */
@@ -56,6 +58,16 @@ export interface JobInfo {
   startedAt?: string
   /** Time when the job completed */
   completedAt?: string
+  /** Alert status matched by the Operarius alertSelector */
+  alertStatus?: string
+  /** Alert labels matched by the Operarius alertSelector */
+  alertLabels?: Record<string, string>
+  /** Whether the Operarius runs in dry-run mode */
+  dryRun?: boolean
+  /** Whether the Operarius is enabled */
+  enabled?: boolean
+  /** Priority of the Operarius rule */
+  priority?: number
 }
 
 /**

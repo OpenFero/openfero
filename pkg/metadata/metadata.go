@@ -48,6 +48,16 @@ var (
 		Name: "openfero_operarius_items_loaded",
 		Help: "Current number of Operarius CRDs loaded in the informer cache",
 	})
+
+	AlertsReceivedTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "openfero_alerts_received_total",
+		Help: "Total number of alerts received by status",
+	}, []string{"status"})
+
+	AlertsMatchedTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "openfero_alerts_matched_total",
+		Help: "Total number of alerts processed by remediation outcome",
+	}, []string{"outcome"})
 )
 
 // Function to get metrics values from runtime/metrics package as float64
@@ -107,6 +117,8 @@ func AddMetricsToPrometheusRegistry() {
 	prometheus.MustRegister(JobsFailedTotal)
 	prometheus.MustRegister(OperariusSyncErrorsTotal)
 	prometheus.MustRegister(OperariusItemsLoaded)
+	prometheus.MustRegister(AlertsReceivedTotal)
+	prometheus.MustRegister(AlertsMatchedTotal)
 	// Get descriptions for all supported metrics.
 	metricsMeta := metrics.All()
 	// Register metrics and retrieve the values in prometheus client
